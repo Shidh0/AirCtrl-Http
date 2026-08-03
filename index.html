@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Air Mouse Controller</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --bg-color: #121212;
+      --card-bg: #1c1c1e;
+      --accent-color: #007aff;
+      --success-color: #34c759;
+      --danger-color: #ff3b30;
+      --text-color: #ffffff;
+      --subtext-color: #888888;
+    }
+
+    body {
+      margin: 0;
+      padding: 12px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      touch-action: manipulation;
+    }
+
+    /* Header Bar */
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 400px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .menu-btn {
+      background: none;
+      border: none;
+      color: var(--text-color);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    #status { font-weight: bold; color: var(--danger-color); font-size: 0.9rem; }
+    .status-connected { color: var(--success-color) !important; }
+
+    /* Sliding Drawer */
+    .drawer-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      z-index: 99;
+    }
+
+    .drawer {
+      position: fixed;
+      top: 0; left: -300px; width: 280px; height: 100%;
+      background: #18181a;
+      z-index: 100;
+      transition: left 0.3s ease;
+      padding: 16px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .drawer.open { left: 0; }
+    .drawer-overlay.open { display: block; }
+
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+      padding-bottom: 8px;
+    }
+
+    /* Common Card Styles */
+    .control-card {
+      background: var(--card-bg);
+      padding: 10px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: var(--subtext-color);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Stacked IP Input Layout */
+    .input-group-stacked {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+    
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #222;
+      color: #fff;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 8px 14px; font-size: 0.85rem; border-radius: 6px;
+      border: none; background: var(--accent-color); color: white;
+      font-weight: bold; cursor: pointer;
+    }
+
+    .btn-block { width: 100%; padding: 10px; }
+    .btn-success { background: var(--success-color); }
+    .btn-secondary { background: #333; border: 1px solid #555; }
+
+    .toggle-group, .slider-group {
+      display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem;
+    }
+    .slider-group { gap: 8px; }
+    .slider-group label { min-width: 110px; }
+    .slider-group input { flex: 1; }
+    .slider-val { min-width: 30px; text-align: right; }
+
+    select {
+      padding: 6px; font-size: 0.85rem; border-radius: 6px;
+      border: 1px solid #444; background: #222; color: #fff;
+    }
+
+    /* Hotkey Action Grid */
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .action-grid button {
+      padding: 10px 6px; font-size: 0.8rem; background: #2a2a2c;
+      border: 1px solid #3a3a3c; text-align: center;
+    }
+
+    /* Video & Overlay Container */
+    .video-container {
+      position: relative;
+      width: 100%; max-width: 400px; aspect-ratio: 16 / 9;
+      border-radius: 12px; overflow: hidden; background: #000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 2px solid var(--accent-color);
+    }
+
+    video, canvas {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      object-fit: cover; transform: scaleX(-1);
+    }
+
+    .hidden-view { display: none !important; }
+
+    /* Performance & Battery Bar */
+    .stats-bar {
+      display: flex; justify-content: space-between; width: 100%;
+      max-width: 400px; font-size: 0.75rem; color: #aaa; margin: 4px 0;
+      background: #18181a; padding: 6px 10px; border-radius: 6px; box-sizing: border-box;
+    }
+
+    /* Virtual Touchpad */
+    .touchpad-area {
+      width: 100%; height: 120px; background: #222; border: 1px dashed #555;
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      color: #888; font-size: 0.8rem; user-select: none; touch-action: none; margin-top: 4px;
+    }
+    .touchpad-buttons { display: flex; gap: 8px; width: 100%; margin-top: 4px; }
+    .touchpad-buttons button { flex: 1; padding: 12px; }
+
+    /* Fullscreen Touchpad Overlay */
+    .fullscreen-touchpad {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #121214; z-index: 1000;
+      display: none; flex-direction: column;
+      box-sizing: border-box; padding: 16px;
+    }
+    .fullscreen-touchpad.active { display: flex; }
+    .fullscreen-tp-header {
+      display: flex; justify-content: space-between; align-items: center;
+      color: #aaa; font-size: 0.9rem; margin-bottom: 12px;
+    }
+    .fullscreen-tp-area {
+      flex: 1; background: #1c1c1e; border: 2px dashed #444; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; color: #666;
+      user-select: none; touch-action: none; font-size: 1rem;
+    }
+
+    /* Logs */
+    .controls { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 8px; }
+    .log-container {
+      width: 100%; max-width: 400px; margin-top: 8px; background: #000;
+      border: 1px solid #333; border-radius: 8px; padding: 8px; box-sizing: border-box;
+    }
+    .log-header {
+      display: flex; justify-content: space-between; font-size: 0.8rem;
+      color: var(--subtext-color); margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 4px;
+    }
+    #log-output {
+      height: 80px; overflow-y: auto; font-family: monospace; font-size: 0.75rem;
+      color: #00ff66; white-space: pre-wrap; word-break: break-all;
+    }
+    .log-error { color: var(--danger-color); }
+    .log-info { color: var(--accent-color); }
+  </style>
+</head>
+<body>
+
+  <div class="header-bar">
+    <button class="menu-btn" onclick="toggleDrawer()">☰</button>
+    <div id="status">Disconnected</div>
+    <div class="header-actions">
+      <button class="menu-btn" title="Toggle Fullscreen" onclick="toggleAppFullscreen()">⛶</button>
+    </div>
+  </div>
+
+  <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <span style="font-weight: bold;">Menu & Action Controls</span>
+      <button class="menu-btn" onclick="toggleDrawer()">✕</button>
+    </div>
+
+    <div class="control-card">
+      <div class="card-title">PC Connection</div>
+      <div class="input-group-stacked">
+        <input type="text" id="pcIp" placeholder="PC IP (e.g. 192.168.1.2)">
+        <button class="btn-block" onclick="manualConnect()">Connect</button>
+      </div>
+    </div>
+
+    <div class="control-card">
+      <div class="card-title">Action Shortcuts</div>
+      <div class="action-grid">
+        <button onclick="sendCmd({cmd: 'press', key: 'playpause'})">⏯️ Play/Pause</button>
+        <button onclick="sendCmd({cmd: 'press', key: 'mute'})">🔇 Mute</button>
+        <button onclick="sendCmd({cmd: 'hotkey', keys: ['alt', 'tab']})">🔄 Alt + Tab</button>
+        <button onclick="sendCmd({cmd: 'press', key: 'f11'})">🔲 Fullscreen</button>
+        <button onclick="sendCmd({cmd: 'hotkey', keys: ['ctrl', '+']})">🔍 Zoom In</button>
+        <button onclick="sendCmd({cmd: 'hotkey', keys: ['ctrl', '-']})">🔎 Zoom Out</button>
+        <button onclick="sendCmd({cmd: 'hotkey', keys: ['win', 'l']})">🔒 Lock PC</button>
+        <button onclick="sendCmd({cmd: 'hotkey', keys: ['win', 'd']})">💻 Desktop</button>
+      </div>
+    </div>
+
+    <div class="control-card">
+      <div class="card-title">Virtual Touchpad</div>
+      <button class="btn-secondary btn-block" onclick="toggleFullscreenTouchpad(true)">📱 Fullscreen Touchpad Mode</button>
+      <div class="touchpad-area" id="touchpad">1-Finger: Move | 2-Finger: Scroll</div>
+      <div class="touchpad-buttons">
+        <button onclick="sendCmd({cmd: 'click', button: 'left'})">Left Click</button>
+        <button onclick="sendCmd({cmd: 'click', button: 'right'})">Right Click</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fullscreen-touchpad" id="fullscreenTouchpad">
+    <div class="fullscreen-tp-header">
+      <span>Fullscreen Trackpad (1-Finger Move / 2-Finger Scroll)</span>
+      <button class="btn-secondary" onclick="toggleFullscreenTouchpad(false)">Exit Trackpad</button>
+    </div>
+    <div class="fullscreen-tp-area" id="touchpadFs">Touch & Drag Here</div>
+    <div class="touchpad-buttons">
+      <button onclick="sendCmd({cmd: 'click', button: 'left'})">Left Click</button>
+      <button onclick="sendCmd({cmd: 'click', button: 'right'})">Right Click</button>
+    </div>
+  </div>
+
+  <div class="video-container" id="videoContainer">
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="outputCanvas"></canvas>
+  </div>
+
+  <div class="stats-bar">
+    <span id="fpsStat">FPS: --</span>
+    <span id="latencyStat">Latency: -- ms</span>
+    <span id="batteryStat">Battery: --%</span>
+  </div>
+
+  <div class="controls">
+    <div class="control-card">
+      <div class="card-title">View & Mode Options</div>
+      <div class="toggle-group">
+        <label>Stealth Mode (Hide Camera):</label>
+        <button type="button" class="btn-secondary" id="hideCamBtn" onclick="toggleCameraView()">Hide Feed</button>
+      </div>
+      <div class="toggle-group">
+        <label>Camera Direction:</label>
+        <button type="button" class="btn-secondary" onclick="toggleCamera()">Switch Camera</button>
+      </div>
+    </div>
+
+    <div class="control-card">
+      <div class="card-title">Mouse Sensitivity & Hand Mode</div>
+      <div class="slider-group">
+        <label>Sensitivity:</label>
+        <input type="range" id="sensSlider" min="1" max="10" value="4" step="0.5">
+        <span id="sensVal" class="slider-val">4.0</span>
+      </div>
+      <div class="toggle-group">
+        <label for="leftHandToggle">Enable Two-Handed Zoom</label>
+        <input type="checkbox" id="leftHandToggle" onchange="updateHandMode()">
+      </div>
+    </div>
+
+    <div class="control-card">
+      <div class="card-title">Performance Settings</div>
+      <div class="toggle-group">
+        <label for="resSelect">Resolution:</label>
+        <select id="resSelect">
+          <option value="180">240x180 (Fastest)</option>
+          <option value="240" selected>320x240 (Default)</option>
+          <option value="360">480x360 (Medium)</option>
+          <option value="480">640x480 (High)</option>
+        </select>
+      </div>
+
+      <div class="toggle-group">
+        <label for="modelComplexitySelect">Model Complexity:</label>
+        <select id="modelComplexitySelect">
+          <option value="0" selected>0 (Lite - Faster)</option>
+          <option value="1">1 (Full - Precise)</option>
+        </select>
+      </div>
+
+      <div class="slider-group">
+        <label>Detection Conf:</label>
+        <input type="range" id="detectConfSlider" min="0.1" max="0.9" value="0.3" step="0.05" oninput="document.getElementById('detectConfVal').innerText = parseFloat(this.value).toFixed(2)">
+        <span id="detectConfVal" class="slider-val">0.30</span>
+      </div>
+
+      <div class="slider-group">
+        <label>Tracking Conf:</label>
+        <input type="range" id="trackConfSlider" min="0.1" max="0.9" value="0.3" step="0.05" oninput="document.getElementById('trackConfVal').innerText = parseFloat(this.value).toFixed(2)">
+        <span id="trackConfVal" class="slider-val">0.30</span>
+      </div>
+
+      <button type="button" class="btn-success" onclick="applyPerformanceSettings()" style="margin-top: 4px;">Apply Settings</button>
+    </div>
+  </div>
+
+  <div class="log-container">
+    <div class="log-header">
+      <span>Console Logs</span>
+      <span style="cursor:pointer;" onclick="clearLogs()">Clear</span>
+    </div>
+    <div id="log-output">Initializing system...</div>
+  </div>
+
+  <script>
+    // --- UI DRAWER & VIEW TOGGLES ---
+    function toggleDrawer() {
+      document.getElementById("drawer").classList.toggle("open");
+      document.getElementById("drawerOverlay").classList.toggle("open");
+    }
+
+    function toggleAppFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          log(`Fullscreen failed: ${err.message}`, "error");
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    function toggleFullscreenTouchpad(show) {
+      const fsTp = document.getElementById("fullscreenTouchpad");
+      if (show) {
+        fsTp.classList.add("active");
+        if (document.getElementById("drawer").classList.contains("open")) {
+          toggleDrawer();
+        }
+      } else {
+        fsTp.classList.remove("active");
+      }
+    }
+
+    let isCamViewHidden = false;
+    function toggleCameraView() {
+      isCamViewHidden = !isCamViewHidden;
+      const container = document.getElementById("videoContainer");
+      const btn = document.getElementById("hideCamBtn");
+      
+      if (isCamViewHidden) {
+        container.classList.add("hidden-view");
+        btn.innerText = "Show Feed";
+        log("Stealth Mode: Visual rendering disabled for battery savings.", "info");
+      } else {
+        container.classList.remove("hidden-view");
+        btn.innerText = "Hide Feed";
+        log("Camera Feed Visible.", "info");
+      }
+    }
+
+    // --- LOGGING ---
+    const logBox = document.getElementById("log-output");
+    function log(msg, type = "") {
+      const timeStr = new Date().toISOString().substring(11, 19);
+      const line = document.createElement("div");
+      if (type === "error") line.className = "log-error";
+      if (type === "info") line.className = "log-info";
+      line.innerText = `[${timeStr}] ${msg}`;
+      logBox.appendChild(line);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    function clearLogs() { logBox.innerText = ""; }
+
+    const sensSlider = document.getElementById("sensSlider");
+    const sensValDisplay = document.getElementById("sensVal");
+    sensSlider.addEventListener("input", (e) => {
+      sensValDisplay.innerText = parseFloat(e.target.value).toFixed(1);
+    });
+
+    // --- WEBSOCKET & SCREEN SYNCING ---
+    let ws = null;
+    let isConnected = false;
+    let SCREEN_W = 1920;
+    let SCREEN_H = 1080;
+
+    function connectWebSocket(targetIp) {
+      if (!targetIp) return;
+      log(`Connecting to ws://${targetIp}:9999...`, "info");
+      
+      try {
+        if (ws) ws.close();
+        ws = new WebSocket(`ws://${targetIp}:9999`);
+
+        ws.onopen = () => {
+          isConnected = true;
+          const statusEl = document.getElementById("status");
+          statusEl.innerText = "Connected!";
+          statusEl.classList.add("status-connected");
+          log(`Connected successfully to ${targetIp}!`, "info");
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "init" && data.screen_w && data.screen_h) {
+              SCREEN_W = data.screen_w;
+              SCREEN_H = data.screen_h;
+              log(`Synced PC Screen Resolution: ${SCREEN_W}x${SCREEN_H}`, "info");
+            }
+          } catch(e) {}
+        };
+
+        ws.onclose = () => {
+          isConnected = false;
+          const statusEl = document.getElementById("status");
+          statusEl.innerText = "Disconnected";
+          statusEl.classList.remove("status-connected");
+          log("WebSocket connection closed.");
+        };
+
+        ws.onerror = () => { log("WebSocket Error: Check IP / Firewall", "error"); };
+      } catch (err) {
+        log(`WS Exception: ${err.message}`, "error");
+      }
+    }
+
+    function manualConnect() {
+      const ip = document.getElementById("pcIp").value.trim();
+      if (!ip) return alert("Please enter PC IP address");
+      connectWebSocket(ip);
+    }
+
+    function sendCmd(payload) {
+      if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+      }
+    }
+
+    // --- BATTERY & PERFORMANCE MONITOR ---
+    let frameCount = 0;
+    let lastFpsTime = Date.now();
+    
+    if ('getBattery' in navigator) {
+      navigator.getBattery().then(battery => {
+        function updateBattery() {
+          const level = Math.round(battery.level * 100);
+          const charging = battery.charging ? "⚡" : "";
+          document.getElementById("batteryStat").innerText = `Battery: ${level}% ${charging}`;
+        }
+        updateBattery();
+        battery.addEventListener('levelchange', updateBattery);
+        battery.addEventListener('chargingchange', updateBattery);
+      });
+    }
+
+    // --- VIRTUAL TOUCHPAD LOGIC (1-Finger Move, 2-Finger Scroll) ---
+    function setupTouchpad(elementId) {
+      const tp = document.getElementById(elementId);
+      if (!tp) return;
+
+      let lastX = 0, lastY = 0;
+      let last2Y = 0;
+      let startTime = 0;
+      let startX = 0, startY = 0;
+
+      tp.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 1) {
+          lastX = e.touches[0].clientX;
+          lastY = e.touches[0].clientY;
+          startX = lastX;
+          startY = lastY;
+          startTime = Date.now();
+        } else if (e.touches.length === 2) {
+          last2Y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        }
+      }, { passive: false });
+
+      tp.addEventListener("touchmove", (e) => {
+        e.preventDefault();
+        if (!isConnected) return;
+
+        if (e.touches.length === 1) {
+          const currentX = e.touches[0].clientX;
+          const currentY = e.touches[0].clientY;
+          const dx = (currentX - lastX) * 1.8;
+          const dy = (currentY - lastY) * 1.8;
+
+          if (Math.hypot(dx, dy) >= 0.5) {
+            sendCmd({ cmd: "move_rel", dx: Math.round(dx), dy: Math.round(dy) });
+            lastX = currentX;
+            lastY = currentY;
+          }
+        } else if (e.touches.length === 2) {
+          const current2Y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const dy = current2Y - last2Y;
+
+          if (Math.abs(dy) > 3) {
+            const amount = Math.round(-dy / 5);
+            if (amount !== 0) {
+              sendCmd({ cmd: "scroll", amount: amount });
+              last2Y = current2Y;
+            }
+          }
+        }
+      }, { passive: false });
+
+      tp.addEventListener("touchend", (e) => {
+        if (e.touches.length === 0) {
+          const duration = Date.now() - startTime;
+          const dist = Math.hypot(lastX - startX, lastY - startY);
+          if (duration < 200 && dist < 8) {
+            sendCmd({ cmd: "click", button: "left" });
+          }
+        }
+      });
+    }
+
+    setupTouchpad("touchpad");
+    setupTouchpad("touchpadFs");
+
+    // --- MEDIAPIPE GESTURE & ENGINE (ORIGINAL CODES & CONSTANTS) ---
+    const PINCH_THRESHOLD = 0.05;
+    const CLICK_COOLDOWN = 350;
+    const MEDIA_COOLDOWN = 700;
+    const SCROLL_COOLDOWN = 60;
+    const VOL_STEP_NORM = 0.03;
+    const SWIPE_THRESHOLD_NORM = 0.08;
+    const EDGE_THRESHOLD_NORM = 0.06;
+    const CONTINUOUS_SCROLL_SPEED = 1;
+
+    let lastClickTime = 0, lastMediaTime = 0, lastScrollTime = 0, lastLhTime = 0;
+    let isHolding = false, prevScrollY = 0, prevMediaX = 0, prevMediaY = 0, prevZoomDist = 0;
+
+    let smoothX = null, smoothY = null;
+
+    function getSmoothedPos(rawX, rawY) {
+      if (smoothX === null || smoothY === null) {
+        smoothX = rawX; smoothY = rawY;
+        return { x: Math.round(smoothX), y: Math.round(smoothY) };
+      }
+      const dx = rawX - smoothX; const dy = rawY - smoothY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < 2.5) return { x: Math.round(smoothX), y: Math.round(smoothY) };
+
+      let factor = dist < 15 ? 0.12 : (dist > 50 ? 0.85 : 0.12 + ((dist - 15) / 35) * (0.85 - 0.12));
+      smoothX += factor * dx; smoothY += factor * dy;
+      return { x: Math.round(smoothX), y: Math.round(smoothY) };
+    }
+
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('outputCanvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    let hands = null;
+
+    try {
+      hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+      hands.setOptions({
+        maxNumHands: 1, modelComplexity: 0,
+        minDetectionConfidence: 0.3, minTrackingConfidence: 0.3
+      });
+      hands.onResults(onResults);
+      log("MediaPipe Hands loaded.", "info");
+    } catch (e) {
+      log(`MediaPipe Load Failed: ${e.message}`, "error");
+    }
+
+    function updateHandMode() {
+      if (!hands) return;
+      const enableLeft = document.getElementById("leftHandToggle").checked;
+      hands.setOptions({ maxNumHands: enableLeft ? 2 : 1 });
+      log(`Hand Mode: ${enableLeft ? "2 Hands" : "1 Hand"}`);
+    }
+
+    let currentResHeight = 240;
+
+    function applyPerformanceSettings() {
+      if (!hands) return;
+      const complexity = parseInt(document.getElementById("modelComplexitySelect").value);
+      const detectConf = parseFloat(document.getElementById("detectConfSlider").value);
+      const trackConf = parseFloat(document.getElementById("trackConfSlider").value);
+      const newResHeight = parseInt(document.getElementById("resSelect").value);
+      const enableLeft = document.getElementById("leftHandToggle").checked;
+
+      hands.setOptions({
+        maxNumHands: enableLeft ? 2 : 1,
+        modelComplexity: complexity,
+        minDetectionConfidence: detectConf,
+        minTrackingConfidence: trackConf
+      });
+
+      log(`Applied MediaPipe Config: Comp=${complexity}, Detect=${detectConf}, Track=${trackConf}`, "info");
+
+      if (newResHeight !== currentResHeight) {
+        currentResHeight = newResHeight;
+        log(`Updating Camera Resolution to ${Math.round(newResHeight * (4/3))}x${newResHeight}...`, "info");
+        startCamera(currentCameraFacing);
+      }
+    }
+
+    function onResults(results) {
+      const startTime = performance.now();
+      
+      // Update FPS stats
+      frameCount++;
+      const nowTime = Date.now();
+      if (nowTime - lastFpsTime >= 1000) {
+        document.getElementById("fpsStat").innerText = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastFpsTime = nowTime;
+      }
+
+      // Visual Overlay Drawing
+      if (!isCamViewHidden) {
+        canvasElement.width = videoElement.videoWidth || 320;
+        canvasElement.height = videoElement.videoHeight || 240;
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+        if (results.multiHandLandmarks) {
+          for (const landmarks of results.multiHandLandmarks) {
+            // Draw tracking index point
+            const pt = landmarks[9];
+            canvasCtx.fillStyle = '#00ff66';
+            canvasCtx.beginPath();
+            canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 6, 0, 2 * Math.PI);
+            canvasCtx.fill();
+          }
+        }
+        canvasCtx.restore();
+      }
+
+      try {
+        if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+          if (isHolding) { sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false; }
+          smoothX = null; smoothY = null;
+          return;
+        }
+
+        const targetAspect = 16 / 9;
+        const cameraAspect = 3 / 4;
+        const cropYPercent = (1.0 - (cameraAspect / targetAspect)) / 2.0; 
+        const minY = cropYPercent;
+        const maxY = 1.0 - cropYPercent;
+
+        function getNormPoint(lm) {
+          if (!lm) return { x: 0, y: 0 };
+          const xNorm = 1.0 - lm.x;
+          const yCropped = (lm.y - minY) / (maxY - minY);
+          return { x: xNorm, y: Math.max(0, Math.min(1, yCropped)) };
+        }
+
+        let rightHand = null, leftHand = null;
+
+        if (results.multiHandedness && results.multiHandedness.length > 0) {
+          for (let i = 0; i < results.multiHandedness.length; i++) {
+            const label = results.multiHandedness[i].label;
+            if (label === "Right") rightHand = results.multiHandLandmarks[i];
+            if (label === "Left") leftHand = results.multiHandLandmarks[i];
+          }
+        }
+        if (!rightHand && results.multiHandLandmarks[0]) rightHand = results.multiHandLandmarks[0];
+
+        const now = Date.now();
+
+        if (rightHand && leftHand && document.getElementById("leftHandToggle").checked) {
+          const rhPalm = getNormPoint(rightHand[5]);
+          const lhPalm = getNormPoint(leftHand[5]);
+          const zoomDist = Math.hypot(rhPalm.x - lhPalm.x, rhPalm.y - lhPalm.y);
+
+          const rhOpen = rightHand[8].y < rightHand[6].y && rightHand[12].y < rightHand[10].y;
+          const lhOpen = leftHand[8].y < leftHand[6].y && leftHand[12].y < leftHand[10].y;
+
+          if (rhOpen && lhOpen) {
+            if (prevZoomDist !== 0 && (now - lastLhTime) > 250) {
+              const diffZoom = zoomDist - prevZoomDist;
+              if (diffZoom > 0.08) { sendCmd({ cmd: "hotkey", keys: ["ctrl", "+"] }); lastLhTime = now; }
+              else if (diffZoom < -0.08) { sendCmd({ cmd: "hotkey", keys: ["ctrl", "-"] }); lastLhTime = now; }
+            }
+            prevZoomDist = zoomDist;
+          } else { prevZoomDist = 0; }
+        }
+
+        if (rightHand) {
+          const landmarks = rightHand;
+          const trackingPt = getNormPoint(landmarks[9]);
+          const thumb = getNormPoint(landmarks[4]);
+          const pinky = getNormPoint(landmarks[20]);
+
+          const index = landmarks[8], middle = landmarks[12], ring = landmarks[16], pinkyLm = landmarks[20];
+          if (!index || !middle || !ring || !pinkyLm) return;
+
+          const sensitivity = parseFloat(sensSlider.value);
+          const margin = 0.2 / (sensitivity / 4.0); 
+          const minM = Math.max(0.0, margin);
+          const maxM = Math.min(1.0, 1.0 - margin);
+
+          const normX = Math.max(0, Math.min(1, (trackingPt.x - minM) / (maxM - minM)));
+          const normY = Math.max(0, Math.min(1, (trackingPt.y - minM) / (maxM - minM)));
+
+          const smoothed = getSmoothedPos(normX * SCREEN_W, normY * SCREEN_H);
+          const currX = smoothed.x, currY = smoothed.y;
+
+          const indexUp = index.y < landmarks[6].y;
+          const indexDown = index.y > landmarks[5].y;
+          const indexHalf = landmarks[6].y <= index.y && index.y <= landmarks[5].y;
+
+          const middleExtended = middle.y < landmarks[10].y;
+          const ringExtended = ring.y < landmarks[14].y;
+          const pinkyExtended = pinkyLm.y < landmarks[18].y;
+
+          const isPinched = Math.hypot(pinky.x - thumb.x, pinky.y - thumb.y) < PINCH_THRESHOLD;
+
+          if (indexUp && middleExtended && ringExtended && !pinkyExtended) {
+            if (isHolding) { sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false; }
+            prevScrollY = 0;
+            if (prevMediaX === 0) { prevMediaX = trackingPt.x; prevMediaY = trackingPt.y; }
+
+            const diffX = trackingPt.x - prevMediaX;
+            const diffY = prevMediaY - trackingPt.y;
+
+            if (Math.abs(diffY) > VOL_STEP_NORM) {
+              sendCmd({ cmd: "press", key: diffY > 0 ? "volumeup" : "volumedown" });
+              prevMediaY = trackingPt.y;
+            }
+
+            if (Math.abs(diffX) > SWIPE_THRESHOLD_NORM && (now - lastMediaTime) > MEDIA_COOLDOWN) {
+              sendCmd({ cmd: "press", key: diffX > 0 ? "nexttrack" : "prevtrack" });
+              lastMediaTime = now; prevMediaX = trackingPt.x;
+            } else if (Math.abs(diffX) < 0.03) { prevMediaX = trackingPt.x; }
+          }
+          else if (indexUp && middleExtended && !ringExtended) {
+            if (isHolding) { sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false; }
+            prevMediaX = 0; prevMediaY = 0;
+            const indexYNorm = getNormPoint(index).y;
+
+            if ((now - lastScrollTime) > SCROLL_COOLDOWN) {
+              if (indexYNorm < (0.05 + EDGE_THRESHOLD_NORM)) {
+                sendCmd({ cmd: "scroll", amount: CONTINUOUS_SCROLL_SPEED });
+                prevScrollY = 0; lastScrollTime = now;
+              } else if (indexYNorm > (0.95 - EDGE_THRESHOLD_NORM)) {
+                sendCmd({ cmd: "scroll", amount: -CONTINUOUS_SCROLL_SPEED });
+                prevScrollY = 0; lastScrollTime = now;
+              } else {
+                if (prevScrollY !== 0) {
+                  const diffY = prevScrollY - indexYNorm;
+                  if (Math.abs(diffY) > 0.015) { 
+                    const ticks = Math.sign(diffY) * Math.min(3, Math.max(1, Math.round(Math.abs(diffY) * 40)));
+                    sendCmd({ cmd: "scroll", amount: ticks });
+                    lastScrollTime = now;
+                  }
+                }
+                prevScrollY = indexYNorm;
+              }
+            }
+          }
+          else {
+            prevScrollY = 0; prevMediaX = 0; prevMediaY = 0;
+
+            if (indexUp) sendCmd({ cmd: "move", x: currX, y: currY });
+
+            if (indexUp && isPinched) {
+              if (!isHolding) { sendCmd({ cmd: "mousedown", button: "left" }); isHolding = true; }
+            } else if (isHolding) {
+              sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false;
+            }
+
+            if (indexHalf && isPinched && (now - lastClickTime) > CLICK_COOLDOWN) {
+              sendCmd({ cmd: "doubleclick" }); lastClickTime = now;
+            }
+            else if (indexDown && isPinched && (now - lastClickTime) > CLICK_COOLDOWN) {
+              sendCmd({ cmd: "click", button: "right" }); lastClickTime = now;
+            }
+          }
+        }
+      } catch (err) {
+        log(`Tracking Frame Error: ${err.message}`, "error");
+      }
+
+      const latency = Math.round(performance.now() - startTime);
+      document.getElementById("latencyStat").innerText = `Latency: ${latency} ms`;
+    }
+
+    let currentCameraFacing = "user";
+    let cameraInstance = null;
+
+    function startCamera(facingMode) {
+      if (cameraInstance) cameraInstance.stop();
+
+      const resHeight = currentResHeight;
+      const resWidth = Math.round(resHeight * (4 / 3));
+
+      try {
+        cameraInstance = new Camera(videoElement, {
+          onFrame: async () => {
+            if (hands) await hands.send({ image: videoElement });
+          },
+          width: resWidth, height: resHeight, facingMode: facingMode
+        });
+        cameraInstance.start();
+        log(`Camera feed active (${facingMode}, ${resWidth}x${resHeight}).`, "info");
+      } catch (e) {
+        log(`Camera Error: ${e.message}`, "error");
+      }
+    }
+
+    function toggleCamera() {
+      currentCameraFacing = currentCameraFacing === "user" ? "environment" : "user";
+      log(`Switching camera to: ${currentCameraFacing}...`, "info");
+      startCamera(currentCameraFacing);
+    }
+
+    startCamera("user");
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const currentHost = window.location.hostname;
+      if (currentHost && currentHost !== "localhost" && currentHost !== "127.0.0.1") {
+        document.getElementById("pcIp").value = currentHost;
+        connectWebSocket(currentHost);
+      } else {
+        log("Opened via localhost. Enter PC IP manually in menu.", "info");
+      }
+    });
+  </script>
+</body>
+</html>
