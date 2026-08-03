@@ -14,7 +14,22 @@ Turn your smartphone's web camera into a wireless trackpad and air gesture contr
 
 ---
 
-## 📋 Prerequisites
+## Hand Gesture Controls Guide
+
+The system uses your hand landmarks to perform various mouse and media actions:
+
+| Action | Hand Gesture / Position |
+| :--- | :--- |
+| **Move Cursor** | Raise your **Index Finger** and move your hand around. |
+| **Left Click Hold / Drag** | Raise your **Index Finger** and pinch your **Thumb** and **Pinky** together. |
+| **Right Click** | Bend your **Index Finger** down while pinching your **Thumb** and **Pinky**. |
+| **Double Click** | Half-bend your **Index Finger** while pinching your **Thumb** and **Pinky**. |
+| **Scroll Up / Down** | Extend your **Index & Middle Fingers** together (peace sign) and move your hand vertically. |
+| **Volume Control** | Extend **Index, Middle, and Ring Fingers** up and move your hand up (volume up) or down (volume down). |
+| **Next / Previous Track** | Extend **Index, Middle, and Ring Fingers** up and swipe horizontally right (next) or left (previous). |
+| **Zoom In / Out** | Enable *Two-Handed Zoom* in settings, open both palms, and adjust the distance between your hands. |
+
+## Prerequisites
 
 - **Windows**
 - [Python](https://www.python.org/downloads/)
@@ -23,7 +38,7 @@ Turn your smartphone's web camera into a wireless trackpad and air gesture contr
 
 ---
 
-## 🚀 Setup Procedure
+## Setup Procedure
 
 ### 1. Clone or Download the Repository
 ```bash
