@@ -29,3 +29,4 @@ Turn your smartphone's web camera into a wireless trackpad and air gesture contr
 ```bash
 git clone [https://github.com/Shidh0/AirCtrl-Http.git](https://github.com/Shidh0/AirCtrl-Http.git)
 cd AirCtrl-http
+python Setup.py
