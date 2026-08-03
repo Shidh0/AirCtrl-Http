@@ -1,10 +1,10 @@
-# Air Mouse Controller 🖐️🖱️
+# AirCtrl-Http
 
 Turn your smartphone's web camera into a wireless trackpad and air gesture control system for your PC! Built with **MediaPipe Hands**, **WebSockets**, and **Python**.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Gesture Control**: Move cursor, click, drag, scroll, adjust volume, and swipe tracks using hand gestures.
 - **Virtual Trackpad**: Fullscreen or embedded touch-friendly trackpad for manual control.
@@ -16,7 +16,9 @@ Turn your smartphone's web camera into a wireless trackpad and air gesture contr
 
 ## 📋 Prerequisites
 
-- **Windows PC** (Python 3.8 or higher installed).
+- **Windows**
+- [Python](https://www.python.org/downloads/)
+- [Git](https://git-scm.com/install/windows)
 - Both PC and smartphone connected to the **same local Wi-Fi network**.
 
 ---
@@ -25,5 +27,5 @@ Turn your smartphone's web camera into a wireless trackpad and air gesture contr
 
 ### 1. Clone or Download the Repository
 ```bash
-git clone [https://github.com/your-username/air-mouse.git](https://github.com/your-username/air-mouse.git)
-cd air-mouse
+git clone [https://github.com/Shidh0/AirCtrl-Http.git](https://github.com/Shidh0/AirCtrl-Http.git)
+cd AirCtrl-http
