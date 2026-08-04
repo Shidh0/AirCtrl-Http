@@ -42,6 +42,6 @@ The system uses your hand landmarks to perform various mouse and media actions:
 
 ### 1. Clone or Download the Repository
 ```bash
-git clone [https://github.com/Shidh0/AirCtrl-Http.git](https://github.com/Shidh0/AirCtrl-Http.git)
+git clone https://github.com/Shidh0/AirCtrl-Http
 cd AirCtrl-http
 python Setup.py
