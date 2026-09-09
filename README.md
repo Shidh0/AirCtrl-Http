@@ -1,14 +1,14 @@
 # AirCtrl-Http
 
-Turn your smartphone's web camera into a wireless trackpad and air gesture control system for your PC! Built with **MediaPipe Hands**, **WebSockets**, and **Python**.
+Turn your smartphone's camera into a  air gesture control system or wireless trackpad for your PC Built with **MediaPipe Hands**, **WebSockets**, and **Python**.
 
 ---
 
 ## Features
 
 - **Gesture Control**: Move cursor, click, drag, scroll, adjust volume, and swipe tracks using hand gestures.
-- **Virtual Trackpad**: Fullscreen or embedded touch-friendly trackpad for manual control.
-- **Hotkeys**: Dedicated buttons for locking PC, switching windows, muting audio, and full-screen controls.
+- **Virtual Trackpad**: Fullscreen or embedded touch trackpad for manual control.
+- **Hotkeys**: Dedicated buttons for switching windows, muting audio, and audio playback and full-screen controls etc.
 - **Stealth & Battery Saver**: Hide the video stream feed on your phone while retaining hand-tracking functionality.
 - **Zero App Installation**: Runs completely inside your mobile web browser.
 
