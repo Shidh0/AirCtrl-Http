@@ -1,895 +1,1121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Air Mouse Controller</title>
-  
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0c1417">
+<meta name="referrer" content="no-referrer">
+<title>Air Mouse</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%236ee7c8'/%3E%3Cpath d='M10 7l13 7.5-5.6 1.7L15.5 23z' fill='%2304231d'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c1417; --panel:#121d22; --raised:#192830; --field:#0e171b;
+  --line:#2a3d45; --line-soft:#1e2f36;
+  --text:#e8f1f0; --muted:#8aa3a6; --dim:#5d777b;
+  --accent:#6ee7c8; --accent-ink:#04231d; --accent-soft:rgba(110,231,200,.14);
+  --warn:#ffc145; --danger:#ff7070;
+  --r-xl:22px; --r-lg:16px; --r-md:12px;
+  --font:'Instrument Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--text);font:400 15px/1.45 var(--font);
+  -webkit-font-smoothing:antialiased;min-height:100vh;min-height:100dvh;touch-action:manipulation;overscroll-behavior-y:none}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-  <style>
-    :root {
-      --bg-color: #121212;
-      --card-bg: #1c1c1e;
-      --accent-color: #007aff;
-      --success-color: #34c759;
-      --danger-color: #ff3b30;
-      --text-color: #ffffff;
-      --subtext-color: #888888;
-    }
+.app{max-width:480px;margin:0 auto;padding:0 16px calc(92px + env(safe-area-inset-bottom))}
 
-    body {
-      margin: 0;
-      padding: 12px;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      touch-action: manipulation;
-    }
+/* top bar */
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+  padding:calc(12px + env(safe-area-inset-top)) 0 12px;background:var(--bg)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;font-size:1.05rem;letter-spacing:-.01em}
+.logo{width:30px;height:30px;border-radius:9px;background:var(--accent);display:grid;place-items:center}
+.logo svg{width:16px;height:16px;fill:var(--accent-ink)}
+.pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);color:var(--muted);
+  padding:7px 12px;border-radius:999px;font-size:.82rem;font-weight:500;cursor:pointer}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--danger)}
+.pill[data-state=connected]{color:var(--text);border-color:rgba(110,231,200,.35)}
+.pill[data-state=connected] .dot{background:var(--accent)}
+.pill[data-state=connecting] .dot,.pill[data-state=authenticating] .dot{background:var(--warn)}
+.pill[data-state=needpin] .dot,.pill[data-state=locked] .dot{background:var(--warn)}
 
-    /* Header Bar */
-    .header-bar {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      max-width: 400px;
-      align-items: center;
-      margin-bottom: 10px;
-    }
+/* generic */
+h1,h2,p{margin:0}
+h2{font-size:.9rem;font-weight:600;color:var(--muted);margin:22px 4px 8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 14px;border-radius:var(--r-md);
+  border:1px solid var(--line);background:var(--raised);font-weight:550;font-size:.9rem;cursor:pointer;transition:background .15s,border-color .15s}
+.btn:active{background:#20353e}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:650}
+.btn.primary:active{background:#5bd3b5}
+.btn.block{width:100%}
+.btn.sm{min-height:34px;padding:6px 10px;font-size:.8rem}
+.group{background:var(--panel);border:1px solid var(--line-soft);border-radius:var(--r-lg)}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:52px}
+.row+.row{border-top:1px solid var(--line-soft)}
+.row .lbl{flex:1;min-width:0}
+.row .hint{display:block;color:var(--dim);font-size:.78rem}
+.field{width:100%;min-height:44px;padding:10px 12px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--field);color:var(--text)}
+.field:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.row .field{width:58%;flex:none}
+select.field{appearance:none;-webkit-appearance:none;padding-right:34px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238aa3a6' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center}
+.note{color:var(--muted);font-size:.82rem;margin:8px 4px 0}
+.note code{font-family:var(--mono);font-size:.78rem;color:var(--text);background:var(--raised);padding:1px 6px;border-radius:6px}
 
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+/* switch */
+.switch{position:relative;width:52px;height:30px;border-radius:999px;border:1px solid var(--line);background:var(--raised);cursor:pointer;padding:0;flex:none;transition:background .2s,border-color .2s}
+.switch .knob{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:var(--muted);display:grid;place-items:center;transition:transform .2s,background .2s}
+.switch .knob svg{display:none}
+.switch[aria-checked=true]{background:var(--accent);border-color:var(--accent)}
+.switch[aria-checked=true] .knob{transform:translateX(22px);background:var(--accent-ink)}
+.switch.lg{width:68px;height:40px}
+.switch.lg .knob{width:32px;height:32px}
+.switch.lg .knob svg{display:block;width:16px;height:16px;color:var(--bg)}
+.switch.lg[aria-checked=true] .knob{transform:translateX(28px)}
+.switch.lg[aria-checked=true] .knob svg{color:var(--accent)}
+.switch:disabled{opacity:.5}
 
-    .menu-btn {
-      background: none;
-      border: none;
-      color: var(--text-color);
-      font-size: 1.5rem;
-      cursor: pointer;
-      padding: 4px 8px;
-    }
+/* range */
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;background:transparent;height:28px;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--line)}
+input[type=range]::-moz-range-track{height:5px;border-radius:3px;background:var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-8.5px;border-radius:50%;background:var(--text);border:3px solid var(--accent)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--text);border:3px solid var(--accent)}
+.val{min-width:42px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent)}
 
-    #status { font-weight: bold; color: var(--danger-color); font-size: 0.9rem; }
-    .status-connected { color: var(--success-color) !important; }
+/* engine */
+.engine{border:1px solid var(--line-soft);background:var(--panel);border-radius:var(--r-xl);padding:16px;transition:border-color .2s,background .2s}
+.engine[data-on=true]{border-color:rgba(110,231,200,.4);background:linear-gradient(180deg,#143029 0,var(--panel) 120px)}
+.engine-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.engine h1{font-size:1.35rem;font-weight:650;letter-spacing:-.02em}
+.engine .status{color:var(--muted);font-size:.88rem;margin-top:2px}
+.engine[data-on=true] .status{color:var(--accent)}
+.engine[data-error=true] .status{color:var(--danger)}
+.viewport{position:relative;margin-top:14px;border-radius:var(--r-lg);overflow:hidden;background:#070d10;aspect-ratio:16/9;border:1px solid var(--line-soft)}
+.viewport canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:none}
+.viewport[data-state=live] canvas{display:block}
+.vp-msg{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 24px;text-align:center;color:var(--muted);font-size:.86rem}
+.vp-msg svg{width:26px;height:26px;color:var(--dim)}
+.viewport:not([data-state=live]) .vp-msg{display:flex}
+.viewport[data-state=hidden]{aspect-ratio:auto;height:54px}
+.viewport[data-state=hidden] .vp-msg{flex-direction:row;gap:10px;padding:0 14px}
+.viewport[data-state=hidden] .vp-msg svg{width:18px;height:18px;color:var(--accent)}
+.engine-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.engine-actions .btn{padding:10px 8px;gap:6px;white-space:nowrap}
 
-    /* Sliding Drawer */
-    .drawer-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.6);
-      display: none;
-      z-index: 99;
-    }
+/* stats */
+.stats{display:flex;margin-top:12px;border:1px solid var(--line-soft);border-radius:var(--r-md);background:var(--panel)}
+.stat{flex:1;padding:10px 12px;text-align:center}
+.stat+.stat{border-left:1px solid var(--line-soft)}
+.stat b{display:block;font-size:1.02rem;font-weight:650;font-variant-numeric:tabular-nums}
+.stat span{color:var(--dim);font-size:.75rem}
 
-    .drawer {
-      position: fixed;
-      top: 0; left: -300px; width: 280px; height: 100%;
-      background: #18181a;
-      z-index: 100;
-      transition: left 0.3s ease;
-      padding: 16px;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow-y: auto;
-    }
+/* guide */
+details.guide{margin-top:12px;border:1px solid var(--line-soft);border-radius:var(--r-lg);background:var(--panel)}
+details.guide summary{padding:14px;cursor:pointer;font-weight:550;list-style:none;display:flex;justify-content:space-between}
+details.guide summary::-webkit-details-marker{display:none}
+details.guide summary::after{content:"+";color:var(--muted);font-size:1.2rem;line-height:1}
+details.guide[open] summary::after{content:"\2212"}
+.guide dl{margin:0;padding:0 14px 6px}
+.guide dt{font-weight:600;margin-top:10px}
+.guide dd{margin:2px 0 0;color:var(--muted);font-size:.86rem}
 
-    .drawer.open { left: 0; }
-    .drawer-overlay.open { display: block; }
+/* touchpad */
+.pad{height:min(46vh,340px);min-height:220px;border-radius:var(--r-xl);border:1px solid var(--line);touch-action:none;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(circle,#1a2c34 1px,transparent 1.5px) 0 0/22px 22px,var(--field);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--dim);text-align:center;font-size:.86rem}
+.pad:active{border-color:var(--accent)}
+.pad-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.pad-btns .btn{min-height:54px}
 
-    .drawer-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #333;
-      padding-bottom: 8px;
-    }
+/* key tiles */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px 12px;border-radius:14px;border:1px solid var(--line);
+  background:var(--raised);box-shadow:0 2px 0 #0a1114;font-size:.8rem;font-weight:550;cursor:pointer}
+.tile svg{color:var(--accent)}
+.tile:active{transform:translateY(2px);box-shadow:none}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px}
 
-    /* Common Card Styles */
-    .control-card {
-      background: var(--card-bg);
-      padding: 10px;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 100%;
-      box-sizing: border-box;
-    }
+/* segmented */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--field);border:1px solid var(--line-soft);border-radius:var(--r-md)}
+.seg button{border:0;background:transparent;border-radius:9px;min-height:38px;color:var(--muted);font-weight:550;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--raised);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
 
-    .card-title {
-      font-size: 0.8rem;
-      font-weight: bold;
-      color: var(--subtext-color);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+/* console */
+.console-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 8px 14px}
+.console-head strong{font-weight:600;font-size:.9rem}
+.console-head div{display:flex;gap:6px}
+#logOutput{height:200px;overflow:auto;margin:0 6px 6px;padding:8px;background:#080e11;border-radius:10px;font:400 .72rem/1.5 var(--mono);color:#9fd8c9;white-space:pre-wrap;word-break:break-word}
+.log-error{color:var(--danger)} .log-warn{color:var(--warn)} .log-info{color:#9fd8c9} .log-debug{color:var(--dim)}
 
-    /* Stacked IP Input Layout */
-    .input-group-stacked {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 100%;
-    }
-    
-    input[type="text"] {
-      width: 100%;
-      padding: 10px;
-      font-size: 0.9rem;
-      border-radius: 6px;
-      border: 1px solid #444;
-      background: #222;
-      color: #fff;
-      box-sizing: border-box;
-    }
+/* tab bar */
+.tabbar{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:30;width:min(100%,480px);display:grid;grid-template-columns:repeat(4,1fr);
+  background:#0a1114;border-top:1px solid var(--line-soft);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+.tabbtn{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;border:0;background:none;color:var(--dim);font-size:.72rem;font-weight:550;cursor:pointer;border-radius:12px}
+.tabbtn.on{color:var(--accent);background:var(--accent-soft)}
+.tabbtn .badge{position:absolute;top:6px;left:calc(50% + 6px);width:8px;height:8px;border-radius:50%;background:var(--warn);display:none}
+.tabbtn[data-attn=true] .badge{display:block}
 
-    button {
-      padding: 8px 14px; font-size: 0.85rem; border-radius: 6px;
-      border: none; background: var(--accent-color); color: white;
-      font-weight: bold; cursor: pointer;
-    }
+/* fullscreen pad */
+.fs{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;flex-direction:column;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+.fs.on{display:flex}
+.fs-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-weight:600}
+.fs .pad{flex:1;height:auto;min-height:0}
 
-    .btn-block { width: 100%; padding: 10px; }
-    .btn-success { background: var(--success-color); }
-    .btn-secondary { background: #333; border: 1px solid #555; }
-
-    .toggle-group, .slider-group {
-      display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem;
-    }
-    .slider-group { gap: 8px; }
-    .slider-group label { min-width: 110px; }
-    .slider-group input { flex: 1; }
-    .slider-val { min-width: 30px; text-align: right; }
-
-    select {
-      padding: 6px; font-size: 0.85rem; border-radius: 6px;
-      border: 1px solid #444; background: #222; color: #fff;
-    }
-
-    /* Hotkey Action Grid */
-    .action-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-    .action-grid button {
-      padding: 10px 6px; font-size: 0.8rem; background: #2a2a2c;
-      border: 1px solid #3a3a3c; text-align: center;
-    }
-
-    /* Video & Overlay Container */
-    .video-container {
-      position: relative;
-      width: 100%; max-width: 400px; aspect-ratio: 16 / 9;
-      border-radius: 12px; overflow: hidden; background: #000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 2px solid var(--accent-color);
-    }
-
-    video, canvas {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      object-fit: cover; transform: scaleX(-1);
-    }
-
-    .hidden-view { display: none !important; }
-
-    /* Performance & Battery Bar */
-    .stats-bar {
-      display: flex; justify-content: space-between; width: 100%;
-      max-width: 400px; font-size: 0.75rem; color: #aaa; margin: 4px 0;
-      background: #18181a; padding: 6px 10px; border-radius: 6px; box-sizing: border-box;
-    }
-
-    /* Virtual Touchpad */
-    .touchpad-area {
-      width: 100%; height: 120px; background: #222; border: 1px dashed #555;
-      border-radius: 8px; display: flex; align-items: center; justify-content: center;
-      color: #888; font-size: 0.8rem; user-select: none; touch-action: none; margin-top: 4px;
-    }
-    .touchpad-buttons { display: flex; gap: 8px; width: 100%; margin-top: 4px; }
-    .touchpad-buttons button { flex: 1; padding: 12px; }
-
-    /* Fullscreen Touchpad Overlay */
-    .fullscreen-touchpad {
-      position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
-      background: #121214; z-index: 1000;
-      display: none; flex-direction: column;
-      box-sizing: border-box; padding: 16px;
-    }
-    .fullscreen-touchpad.active { display: flex; }
-    .fullscreen-tp-header {
-      display: flex; justify-content: space-between; align-items: center;
-      color: #aaa; font-size: 0.9rem; margin-bottom: 12px;
-    }
-    .fullscreen-tp-area {
-      flex: 1; background: #1c1c1e; border: 2px dashed #444; border-radius: 12px;
-      display: flex; align-items: center; justify-content: center; color: #666;
-      user-select: none; touch-action: none; font-size: 1rem;
-    }
-
-    /* Logs */
-    .controls { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 8px; }
-    .log-container {
-      width: 100%; max-width: 400px; margin-top: 8px; background: #000;
-      border: 1px solid #333; border-radius: 8px; padding: 8px; box-sizing: border-box;
-    }
-    .log-header {
-      display: flex; justify-content: space-between; font-size: 0.8rem;
-      color: var(--subtext-color); margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 4px;
-    }
-    #log-output {
-      height: 80px; overflow-y: auto; font-family: monospace; font-size: 0.75rem;
-      color: #00ff66; white-space: pre-wrap; word-break: break-all;
-    }
-    .log-error { color: var(--danger-color); }
-    .log-info { color: var(--accent-color); }
-  </style>
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
 </head>
 <body>
 
-  <div class="header-bar">
-    <button class="menu-btn" onclick="toggleDrawer()">☰</button>
-    <div id="status">Disconnected</div>
-    <div class="header-actions">
-      <button class="menu-btn" title="Toggle Fullscreen" onclick="toggleAppFullscreen()">⛶</button>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></symbol>
+    <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M4 3l7 17 2.5-7.5L21 10z"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15.5h6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M18.4 6.6a9 9 0 1 1-12.8 0M12 2v10"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M17.9 17.9A10 10 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2M1 1l22 22"/></symbol>
+    <symbol id="i-video-off" viewBox="0 0 24 24"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.7 0H14a2 2 0 0 1 2 2v3.3l1 1L23 7v10M1 1l22 22"/></symbol>
+    <symbol id="i-flip" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-vol-up" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5zM19 5a10 10 0 0 1 0 14M15.5 8.5a5 5 0 0 1 0 7"/></symbol>
+    <symbol id="i-vol-down" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 0 1 0 7"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM19 5v14"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 5v14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  </defs>
+</svg>
+
+<!-- Camera sink: never displayed. Kept in layout (2px, almost transparent) so browsers keep delivering frames. -->
+<video id="webcam" autoplay playsinline muted aria-hidden="true"
+  style="position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;z-index:-1"></video>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo"><svg viewBox="0 0 24 24"><path d="M5 2l15 8.6-6.4 2L11 21z"/></svg></span>
+      Air Mouse
     </div>
+    <button class="pill" id="connPill" data-state="offline" type="button" aria-label="Connection status"><span class="dot"></span><span id="connText">Offline</span></button>
+  </header>
+
+  <!-- GESTURES -->
+  <main class="tab" id="tab-gestures">
+    <section class="engine" id="engine" data-on="false">
+      <div class="engine-head">
+        <div>
+          <h1>Hand tracking</h1>
+          <p class="status" id="engineStatus">Off. Camera is not in use.</p>
+        </div>
+        <button class="switch lg" id="engineSwitch" role="switch" aria-checked="false" aria-label="Hand tracking" type="button">
+          <span class="knob"><svg class="i"><use href="#i-power"/></svg></span>
+        </button>
+      </div>
+      <div class="viewport" id="viewport" data-state="off">
+        <canvas id="preview"></canvas>
+        <div class="vp-msg" id="vpMsg"><svg class="i"><use href="#i-video-off"/></svg><p id="vpText">Camera is off. Turn on hand tracking to control the cursor with gestures.</p></div>
+      </div>
+      <div class="engine-actions">
+        <button class="btn" id="hideBtn" type="button"><svg class="i"><use href="#i-eye-off"/></svg><span>Hide preview</span></button>
+        <button class="btn" id="flipBtn" type="button"><svg class="i"><use href="#i-flip"/></svg><span>Flip camera</span></button>
+      </div>
+    </section>
+
+    <div class="stats" aria-live="off">
+      <div class="stat"><b id="fpsStat">--</b><span>FPS</span></div>
+      <div class="stat"><b id="latencyStat">--</b><span>Inference ms</span></div>
+      <div class="stat"><b id="batteryStat">--</b><span>Battery</span></div>
+    </div>
+
+    <h2>Tracking</h2>
+    <div class="group">
+      <div class="row">
+        <span class="lbl">Sensitivity</span>
+        <input type="range" id="sensSlider" min="1" max="10" step="0.5" value="4" aria-label="Sensitivity">
+        <span class="val" id="sensVal">4.0</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Two-handed zoom<span class="hint">Open both hands, spread or pinch together</span></span>
+        <button class="switch" id="twoHand" role="switch" aria-checked="false" aria-label="Two-handed zoom" type="button"><span class="knob"></span></button>
+      </div>
+    </div>
+
+    <details class="guide">
+      <summary>Gesture guide</summary>
+      <dl>
+        <dt>Move the cursor</dt><dd>Raise your index finger and keep the others curled.</dd>
+        <dt>Click and hold</dt><dd>With your index raised, pinch your thumb and pinky together. Release to let go.</dd>
+        <dt>Double click</dt><dd>Lower your index finger to half height and pinch.</dd>
+        <dt>Right click</dt><dd>Curl your index finger down and pinch.</dd>
+        <dt>Scroll</dt><dd>Raise index and middle fingers, then move up or down. Hold near the top or bottom edge to keep scrolling.</dd>
+        <dt>Volume and tracks</dt><dd>Raise index, middle and ring fingers. Move up or down for volume, swipe left or right to change track.</dd>
+      </dl>
+    </details>
+  </main>
+
+  <!-- TOUCHPAD -->
+  <main class="tab" id="tab-touchpad" hidden>
+    <h2>Touchpad</h2>
+    <div class="pad" id="touchpad">
+      <svg class="i" style="width:28px;height:28px"><use href="#i-pointer"/></svg>
+      <span>One finger moves. Two fingers scroll. Tap to click.</span>
+    </div>
+    <div class="pad-btns">
+      <button class="btn" type="button" data-cmd='{"cmd":"click","button":"left"}'>Left click</button>
+      <button class="btn" type="button" data-cmd='{"cmd":"click","button":"right"}'>Right click</button>
+    </div>
+    <button class="btn block" style="margin-top:10px" id="openPad" type="button"><svg class="i"><use href="#i-expand"/></svg>Full-screen touchpad</button>
+    <p class="note">Full-screen mode pauses hand tracking so the camera is released.</p>
+  </main>
+
+  <!-- KEYS -->
+  <main class="tab" id="tab-keys" hidden>
+    <h2>Type on PC</h2>
+    <div class="group">
+      <div class="row">
+        <input class="field" style="width:100%" type="text" id="kbInput" placeholder="Type here, sends instantly"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Type on PC">
+      </div>
+      <div class="pair" style="padding-top:2px">
+        <button class="btn" type="button" data-cmd='{"cmd":"press","key":"enter"}'>Enter</button>
+        <button class="btn" type="button" data-cmd='{"cmd":"press","key":"backspace"}'>Backspace</button>
+      </div>
+    </div>
+    <h2>Shortcuts</h2>
+    <div class="tiles">
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"volumeup"}'><svg class="i"><use href="#i-vol-up"/></svg>Volume up</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"volumedown"}'><svg class="i"><use href="#i-vol-down"/></svg>Volume down</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"mute"}'><svg class="i"><use href="#i-mute"/></svg>Mute</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"prevtrack"}'><svg class="i"><use href="#i-prev"/></svg>Previous</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"playpause"}'><svg class="i"><use href="#i-play"/></svg>Play / pause</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"nexttrack"}'><svg class="i"><use href="#i-next"/></svg>Next</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"hotkey","keys":["alt","tab"]}'><svg class="i"><use href="#i-layers"/></svg>Alt + Tab</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"hotkey","keys":["win","d"]}'><svg class="i"><use href="#i-monitor"/></svg>Show desktop</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"f11"}'><svg class="i"><use href="#i-expand"/></svg>Full screen</button>
+    </div>
+  </main>
+
+  <!-- SETUP -->
+  <main class="tab" id="tab-setup" hidden>
+    <h2>PC connection</h2>
+    <div class="group">
+      <div class="row">
+        <label class="lbl" for="pcIp">PC address</label>
+        <input class="field" type="text" id="pcIp" placeholder="192.168.1.20" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="row">
+        <label class="lbl" for="pcPin">PIN</label>
+        <input class="field" type="password" id="pcPin" placeholder="XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12">
+      </div>
+      <div class="pair" style="padding-top:12px;grid-template-columns:1fr"><button class="btn primary" id="connectBtn" type="button">Connect</button></div>
+    </div>
+    <p class="note">Find the PIN on your PC by running <code>python control.py --show-pin</code>. It is stored only on this phone.</p>
+
+    <h2>Camera source</h2>
+    <div class="group" style="padding:12px 14px 14px">
+      <div class="seg" role="group" aria-label="Camera source">
+        <button type="button" id="srcLocal" aria-pressed="true">Phone camera</button>
+        <button type="button" id="srcRemote" aria-pressed="false">Remote stream</button>
+      </div>
+      <div id="remoteBox" hidden style="margin-top:12px;display:grid;gap:10px">
+        <input class="field" type="text" id="streamIp" placeholder="192.168.1.20:8080" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Stream address">
+        <button class="btn" id="loadStream" type="button">Load stream</button>
+      </div>
+    </div>
+
+    <h2>Performance</h2>
+    <div class="group">
+      <div class="row"><label class="lbl" for="resSelect">Resolution</label>
+        <select class="field" id="resSelect"><option value="180">240x180 (fast)</option><option value="240">320x240 (default)</option><option value="360">480x360</option><option value="480">640x480 (sharp)</option></select></div>
+      <div class="row"><label class="lbl" for="fpsSelect">Max FPS<span class="hint">Lower saves battery</span></label>
+        <select class="field" id="fpsSelect"><option value="15">15</option><option value="24">24</option><option value="30">30</option><option value="60">60</option></select></div>
+      <div class="row"><label class="lbl" for="modelSelect">Model</label>
+        <select class="field" id="modelSelect"><option value="0">Lite (fast)</option><option value="1">Full (precise)</option></select></div>
+      <div class="row"><span class="lbl">Detect confidence</span>
+        <input type="range" id="detectSlider" min="0.1" max="0.9" step="0.05" value="0.3" aria-label="Detection confidence"><span class="val" id="detectVal">0.30</span></div>
+      <div class="row"><span class="lbl">Track confidence</span>
+        <input type="range" id="trackSlider" min="0.1" max="0.9" step="0.05" value="0.3" aria-label="Tracking confidence"><span class="val" id="trackVal">0.30</span></div>
+      <div class="pair" style="padding-top:12px;grid-template-columns:1fr"><button class="btn" id="applyPerf" type="button">Apply settings</button></div>
+    </div>
+
+    <h2>Console</h2>
+    <div class="group">
+      <div class="console-head"><strong>Activity log</strong>
+        <div>
+          <button class="btn sm" id="copyLog" type="button"><svg class="i" style="width:15px;height:15px"><use href="#i-copy"/></svg>Copy</button>
+          <button class="btn sm" id="clearLog" type="button"><svg class="i" style="width:15px;height:15px"><use href="#i-trash"/></svg>Clear</button>
+        </div>
+      </div>
+      <div id="logOutput" role="log" aria-live="off"></div>
+    </div>
+  </main>
+</div>
+
+<nav class="tabbar" aria-label="Sections">
+  <button class="tabbtn on" data-tab="gestures" type="button"><svg class="i"><use href="#i-target"/></svg>Gestures</button>
+  <button class="tabbtn" data-tab="touchpad" type="button"><svg class="i"><use href="#i-pointer"/></svg>Touchpad</button>
+  <button class="tabbtn" data-tab="keys" type="button"><svg class="i"><use href="#i-keyboard"/></svg>Keys</button>
+  <button class="tabbtn" data-tab="setup" type="button" id="setupTab"><svg class="i"><use href="#i-sliders"/></svg>Setup<span class="badge"></span></button>
+</nav>
+
+<div class="fs" id="fsPad" role="dialog" aria-label="Full-screen touchpad">
+  <div class="fs-head"><span>Touchpad</span><button class="btn sm" id="closePad" type="button">Close</button></div>
+  <div class="pad" id="touchpadFs"><svg class="i" style="width:32px;height:32px"><use href="#i-pointer"/></svg><span>One finger moves. Two fingers scroll.<br>Tap to click.</span></div>
+  <div class="pad-btns">
+    <button class="btn" type="button" data-cmd='{"cmd":"click","button":"left"}'>Left click</button>
+    <button class="btn" type="button" data-cmd='{"cmd":"click","button":"right"}'>Right click</button>
   </div>
+</div>
 
-  <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
-  <div class="drawer" id="drawer">
-    <div class="drawer-header">
-      <span style="font-weight: bold;">Menu & Action Controls</span>
-      <button class="menu-btn" onclick="toggleDrawer()">✕</button>
-    </div>
+<script>
+(() => {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-    <div class="control-card">
-      <div class="card-title">PC Connection</div>
-      <div class="input-group-stacked">
-        <input type="text" id="pcIp" placeholder="PC IP (e.g. 192.168.1.2)">
-        <button class="btn-block" onclick="manualConnect()">Connect</button>
-      </div>
-    </div>
+/* ======================= storage ======================= */
+const store = {
+  get(k, d = null) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const DEFAULTS = { engine: true, hidePreview: false, sens: 4, twoHand: false, res: 240, complexity: 0,
+  detect: 0.3, track: 0.3, fps: 30, facing: 'user', source: 'local', streamIp: '', pcIp: '' };
+const settings = Object.assign({}, DEFAULTS);
+try { Object.assign(settings, JSON.parse(store.get('airmouse.settings', '{}'))); } catch {}
+const saveSettings = () => store.set('airmouse.settings', JSON.stringify(settings));
 
-    <div class="control-card">
-      <div class="card-title">Action Shortcuts</div>
-      <div class="action-grid">
-        <button onclick="sendCmd({cmd: 'press', key: 'playpause'})">⏯️ Play/Pause</button>
-        <button onclick="sendCmd({cmd: 'press', key: 'mute'})">🔇 Mute</button>
-        <button onclick="sendCmd({cmd: 'hotkey', keys: ['alt', 'tab']})">🔄 Alt + Tab</button>
-        <button onclick="sendCmd({cmd: 'press', key: 'f11'})">🔲 Fullscreen</button>
-        <button onclick="sendCmd({cmd: 'hotkey', keys: ['ctrl', '+']})">🔍 Zoom In</button>
-        <button onclick="sendCmd({cmd: 'hotkey', keys: ['ctrl', '-']})">🔎 Zoom Out</button>
-        <button onclick="sendCmd({cmd: 'hotkey', keys: ['win', 'l']})">🔒 Lock PC</button>
-        <button onclick="sendCmd({cmd: 'hotkey', keys: ['win', 'd']})">💻 Desktop</button>
-      </div>
-    </div>
+/* ======================= logging ======================= */
+const logBox = $('logOutput');
+const LOG_MAX = 300;
+const logBuf = [];
+function log(msg, type = 'info') {
+  try {
+    const d = new Date();
+    const ts = [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+    const text = `[${ts}] ${msg}`;
+    logBuf.push(text);
+    if (logBuf.length > LOG_MAX) logBuf.shift();
+    const line = document.createElement('div');
+    line.className = 'log-' + type;
+    line.textContent = text;
+    logBox.appendChild(line);
+    while (logBox.childElementCount > LOG_MAX) logBox.removeChild(logBox.firstChild);
+    logBox.scrollTop = logBox.scrollHeight;
+    (type === 'error' ? console.error : type === 'warn' ? console.warn : console.log)(text);
+  } catch {}
+}
+const lastLogged = new Map();
+function logThrottled(key, msg, type = 'warn', every = 5000) {
+  const now = Date.now();
+  if (now - (lastLogged.get(key) || 0) < every) return;
+  lastLogged.set(key, now);
+  log(msg, type);
+}
+window.addEventListener('error', e => log(`Script error: ${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})`, 'error'));
+window.addEventListener('unhandledrejection', e => log(`Unhandled promise rejection: ${(e.reason && e.reason.message) || e.reason}`, 'error'));
+$('clearLog').onclick = () => { logBox.textContent = ''; logBuf.length = 0; };
+$('copyLog').onclick = async () => {
+  const text = logBuf.join('\n');
+  try {
+    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+    else { const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    log('Log copied to clipboard');
+  } catch (e) { log(`Copy failed: ${e.message}`, 'error'); }
+};
 
-    <div class="control-card">
-      <div class="card-title">Virtual Touchpad</div>
-      <button class="btn-secondary btn-block" onclick="toggleFullscreenTouchpad(true)">📱 Fullscreen Touchpad Mode</button>
-      <div class="touchpad-area" id="touchpad">1-Finger: Move | 2-Finger: Scroll</div>
-      <div class="touchpad-buttons">
-        <button onclick="sendCmd({cmd: 'click', button: 'left'})">Left Click</button>
-        <button onclick="sendCmd({cmd: 'click', button: 'right'})">Right Click</button>
-      </div>
-    </div>
-  </div>
+/* ======================= tabs ======================= */
+let activeTab = 'gestures';
+function showTab(name) {
+  activeTab = name;
+  $$('.tab').forEach(s => { s.hidden = s.id !== 'tab-' + name; });
+  $$('.tabbtn').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  window.scrollTo(0, 0);
+}
+$$('.tabbtn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+$('connPill').onclick = () => showTab('setup');
 
-  <div class="fullscreen-touchpad" id="fullscreenTouchpad">
-    <div class="fullscreen-tp-header">
-      <span>Fullscreen Trackpad (1-Finger Move / 2-Finger Scroll)</span>
-      <button class="btn-secondary" onclick="toggleFullscreenTouchpad(false)">Exit Trackpad</button>
-    </div>
-    <div class="fullscreen-tp-area" id="touchpadFs">Touch & Drag Here</div>
-    <div class="touchpad-buttons">
-      <button onclick="sendCmd({cmd: 'click', button: 'left'})">Left Click</button>
-      <button onclick="sendCmd({cmd: 'click', button: 'right'})">Right Click</button>
-    </div>
-  </div>
+/* ======================= PC connection ======================= */
+let SCREEN_W = 1920, SCREEN_H = 1080;
+const conn = { ws: null, state: 'offline', host: '', port: 9999, timer: null, authTimer: null, delay: 1000, stop: false, badPin: false };
+const CONN_LABELS = { offline: 'Offline', connecting: 'Connecting', authenticating: 'Connecting', connected: 'Connected',
+  needpin: 'PIN needed', badpin: 'Wrong PIN', locked: 'Locked out' };
 
-  <div class="video-container" id="videoContainer">
-    <video id="webcam" autoplay playsinline muted></video>
-    <canvas id="outputCanvas"></canvas>
-  </div>
+function setConn(state) {
+  conn.state = state;
+  const pill = $('connPill');
+  pill.dataset.state = state;
+  $('connText').textContent = CONN_LABELS[state] || state;
+  $('setupTab').dataset.attn = String(state !== 'connected');
+}
 
-  <div class="stats-bar">
-    <span id="fpsStat">FPS: --</span>
-    <span id="latencyStat">Latency: -- ms</span>
-    <span id="batteryStat">Battery: --%</span>
-  </div>
+function parseHost(raw) {
+  const s = String(raw || '').trim().replace(/^[a-z]+:\/\//i, '').split(/[\/?#]/)[0];
+  const m = /^([A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?)(?::(\d{1,5}))?$/.exec(s);
+  if (!m) return null;
+  const port = m[3] ? parseInt(m[3], 10) : 9999;
+  return port >= 1 && port <= 65535 ? { host: m[1], port } : null;
+}
 
-  <div class="controls">
-    <div class="control-card">
-      <div class="card-title">View & Mode Options</div>
-      <div class="toggle-group">
-        <label>Stealth Mode (Hide Camera):</label>
-        <button type="button" class="btn-secondary" id="hideCamBtn" onclick="toggleCameraView()">Hide Feed</button>
-      </div>
-      <div class="toggle-group">
-        <label>Camera Direction:</label>
-        <button type="button" class="btn-secondary" onclick="toggleCamera()">Switch Camera</button>
-      </div>
-    </div>
+const getPin = () => store.get('airmouse.pin', '');
 
-    <div class="control-card">
-      <div class="card-title">Mouse Sensitivity & Hand Mode</div>
-      <div class="slider-group">
-        <label>Sensitivity:</label>
-        <input type="range" id="sensSlider" min="1" max="10" value="4" step="0.5">
-        <span id="sensVal" class="slider-val">4.0</span>
-      </div>
-      <div class="toggle-group">
-        <label for="leftHandToggle">Enable Two-Handed Zoom</label>
-        <input type="checkbox" id="leftHandToggle" onchange="updateHandMode()">
-      </div>
-    </div>
+function closeConn() {
+  clearTimeout(conn.timer); clearTimeout(conn.authTimer);
+  const ws = conn.ws; conn.ws = null;
+  if (ws) { ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null; try { ws.close(); } catch {} }
+  isHolding = false;
+}
 
-    <div class="control-card">
-      <div class="card-title">Performance Settings</div>
-      <div class="toggle-group">
-        <label for="resSelect">Resolution:</label>
-        <select id="resSelect">
-          <option value="180">240x180 (Fastest)</option>
-          <option value="240" selected>320x240 (Default)</option>
-          <option value="360">480x360 (Medium)</option>
-          <option value="480">640x480 (High)</option>
-        </select>
-      </div>
+function scheduleReconnect(delay) {
+  clearTimeout(conn.timer);
+  const wait = delay || conn.delay;
+  log(`Reconnecting in ${Math.round(wait / 1000)}s...`, 'warn');
+  conn.timer = setTimeout(() => connect(`${conn.host}:${conn.port}`), wait);
+  conn.delay = Math.min(conn.delay * 2, 10000);
+}
 
-      <div class="toggle-group">
-        <label for="modelComplexitySelect">Model Complexity:</label>
-        <select id="modelComplexitySelect">
-          <option value="0" selected>0 (Lite - Faster)</option>
-          <option value="1">1 (Full - Precise)</option>
-        </select>
-      </div>
+function connect(raw) {
+  const target = parseHost(raw);
+  if (!target) { setConn('offline'); log('Enter a valid PC address, for example 192.168.1.20', 'error'); return; }
+  const pin = getPin();
+  if (!pin) {
+    setConn('needpin'); log('Enter the PIN from "python control.py --show-pin" to connect.', 'warn');
+    showTab('setup'); $('pcPin').focus(); return;
+  }
+  closeConn();
+  conn.stop = false; conn.badPin = false; conn.host = target.host; conn.port = target.port;
+  settings.pcIp = target.port === 9999 ? target.host : `${target.host}:${target.port}`; saveSettings();
+  setConn('connecting');
+  log(`Connecting to ${target.host}:${target.port}...`);
 
-      <div class="slider-group">
-        <label>Detection Conf:</label>
-        <input type="range" id="detectConfSlider" min="0.1" max="0.9" value="0.3" step="0.05" oninput="document.getElementById('detectConfVal').innerText = parseFloat(this.value).toFixed(2)">
-        <span id="detectConfVal" class="slider-val">0.30</span>
-      </div>
+  let ws;
+  try { ws = new WebSocket(`ws://${target.host}:${target.port}`); }
+  catch (e) { log(`Could not open connection: ${e.message}`, 'error'); setConn('offline'); scheduleReconnect(); return; }
+  conn.ws = ws;
 
-      <div class="slider-group">
-        <label>Tracking Conf:</label>
-        <input type="range" id="trackConfSlider" min="0.1" max="0.9" value="0.3" step="0.05" oninput="document.getElementById('trackConfVal').innerText = parseFloat(this.value).toFixed(2)">
-        <span id="trackConfVal" class="slider-val">0.30</span>
-      </div>
-
-      <button type="button" class="btn-success" onclick="applyPerformanceSettings()" style="margin-top: 4px;">Apply Settings</button>
-    </div>
-  </div>
-
-  <div class="log-container">
-    <div class="log-header">
-      <span>Console Logs</span>
-      <span style="cursor:pointer;" onclick="clearLogs()">Clear</span>
-    </div>
-    <div id="log-output">Initializing system...</div>
-  </div>
-
-  <script>
-    // --- UI DRAWER & VIEW TOGGLES ---
-    function toggleDrawer() {
-      document.getElementById("drawer").classList.toggle("open");
-      document.getElementById("drawerOverlay").classList.toggle("open");
+  ws.onopen = () => {
+    if (conn.ws !== ws) return;
+    setConn('authenticating');
+    ws.send(JSON.stringify({ cmd: 'auth', token: pin }));
+    conn.authTimer = setTimeout(() => {
+      if (conn.ws === ws && conn.state !== 'connected') { log('The PC did not answer the PIN check in time.', 'error'); try { ws.close(); } catch {} }
+    }, 6000);
+  };
+  ws.onmessage = (ev) => {
+    if (conn.ws !== ws) return;
+    let data; try { data = JSON.parse(ev.data); } catch { return; }
+    if (data.type === 'init') {
+      clearTimeout(conn.authTimer);
+      if (Number.isFinite(data.screen_w) && Number.isFinite(data.screen_h)) { SCREEN_W = data.screen_w; SCREEN_H = data.screen_h; }
+      conn.delay = 1000; setConn('connected');
+      log(`Connected. PC screen ${SCREEN_W}x${SCREEN_H}`);
+    } else if (data.type === 'auth_failed') {
+      conn.badPin = true;
     }
+  };
+  ws.onclose = (ev) => {
+    if (conn.ws !== ws) return;
+    clearTimeout(conn.authTimer); conn.ws = null; isHolding = false;
+    if (conn.stop) { setConn('offline'); return; }
+    if (conn.badPin || ev.code === 4401) {
+      setConn('badpin'); log('The PC rejected the PIN. Check it and connect again.', 'error');
+      showTab('setup'); $('pcPin').focus(); return;
+    }
+    if (ev.code === 4429) { setConn('locked'); log('Too many wrong PINs. The PC blocked this phone for 5 minutes.', 'error'); scheduleReconnect(60000); return; }
+    if (ev.code === 1008) { setConn('offline'); log('The PC refused this connection (address or origin not allowed).', 'error'); return; }
+    setConn('offline'); log('Connection lost.', 'warn'); scheduleReconnect();
+  };
+  ws.onerror = () => logThrottled('wserr', 'Cannot reach the PC. Check the address, that control.py is running, and the firewall.', 'error', 8000);
+}
 
-    function toggleAppFullscreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => {
-          log(`Fullscreen failed: ${err.message}`, "error");
-        });
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
+function sendCmd(payload) {
+  const ws = conn.ws;
+  if (!ws || ws.readyState !== WebSocket.OPEN || conn.state !== 'connected') return;
+  if (ws.bufferedAmount > 16384 && (payload.cmd === 'move' || payload.cmd === 'move_rel')) return; // network is congested
+  ws.send(JSON.stringify(payload));
+}
+
+$('connectBtn').onclick = () => {
+  const pinRaw = $('pcPin').value.trim();
+  if (pinRaw) store.set('airmouse.pin', pinRaw.toUpperCase());
+  connect($('pcIp').value);
+};
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cmd]');
+  if (!b) return;
+  try { sendCmd(JSON.parse(b.dataset.cmd)); } catch (err) { log(`Bad button: ${err.message}`, 'error'); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  loop.lastTick = performance.now();
+  if (conn.host && !conn.ws && !conn.stop && conn.state !== 'badpin' && conn.state !== 'locked') connect(`${conn.host}:${conn.port}`);
+  if (engine.state === 'on' && sourceDead()) { log('Camera stopped while in the background. Restarting...', 'warn'); restartSource(); }
+});
+window.addEventListener('online', () => { if (conn.host && !conn.ws) connect(`${conn.host}:${conn.port}`); });
+
+/* ======================= live keyboard ======================= */
+let prevKb = '';
+$('kbInput').addEventListener('input', (e) => {
+  const v = e.target.value;
+  if (v.length > prevKb.length) sendCmd({ cmd: 'type', text: v.slice(prevKb.length) });
+  else for (let i = 0; i < Math.min(prevKb.length - v.length, 50); i++) sendCmd({ cmd: 'press', key: 'backspace' });
+  prevKb = v;
+  if (v.length > 40) { e.target.value = ''; prevKb = ''; }
+});
+$('kbInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { sendCmd({ cmd: 'press', key: 'enter' }); e.target.value = ''; prevKb = ''; }
+  else if (e.key === 'Backspace' && prevKb.length === 0) sendCmd({ cmd: 'press', key: 'backspace' });
+});
+
+/* ======================= touchpad ======================= */
+function setupTouchpad(el) {
+  let lastX = 0, lastY = 0, last2Y = 0, startT = 0, moved = 0, multi = false;
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; startT = Date.now(); moved = 0; multi = false;
+    } else if (e.touches.length === 2) {
+      multi = true; last2Y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    }
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1 && !multi) {
+      const x = e.touches[0].clientX, y = e.touches[0].clientY;
+      const dx = (x - lastX) * 1.8, dy = (y - lastY) * 1.8;
+      if (Math.hypot(dx, dy) >= 0.5) {
+        moved += Math.hypot(x - lastX, y - lastY);
+        sendCmd({ cmd: 'move_rel', dx: Math.round(dx), dy: Math.round(dy) });
+        lastX = x; lastY = y;
+      }
+    } else if (e.touches.length === 2) {
+      const y2 = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const dy = y2 - last2Y;
+      if (Math.abs(dy) > 3) {
+        const amount = Math.round(-dy / 5);
+        if (amount !== 0) { sendCmd({ cmd: 'scroll', amount }); last2Y = y2; }
       }
     }
+  }, { passive: false });
+  el.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0 && !multi && Date.now() - startT < 200 && moved < 8) sendCmd({ cmd: 'click', button: 'left' });
+  });
+  el.addEventListener('touchcancel', () => { multi = true; });
+}
+setupTouchpad($('touchpad'));
+setupTouchpad($('touchpadFs'));
 
-    function toggleFullscreenTouchpad(show) {
-      const fsTp = document.getElementById("fullscreenTouchpad");
-      if (show) {
-        fsTp.classList.add("active");
-        if (document.getElementById("drawer").classList.contains("open")) {
-          toggleDrawer();
-        }
-      } else {
-        fsTp.classList.remove("active");
-      }
-    }
+let resumeAfterPad = false;
+$('openPad').onclick = () => {
+  $('fsPad').classList.add('on');
+  if (engine.state === 'on' || engine.state === 'starting') {
+    resumeAfterPad = true; log('Full-screen touchpad: pausing hand tracking and releasing the camera.');
+    engineGen++; teardownTracking(); setEngineState('paused');
+  }
+};
+$('closePad').onclick = () => {
+  $('fsPad').classList.remove('on');
+  if (resumeAfterPad) { resumeAfterPad = false; log('Resuming hand tracking.'); setEngine(true); }
+};
 
-    let isCamViewHidden = false;
-    function toggleCameraView() {
-      isCamViewHidden = !isCamViewHidden;
-      const container = document.getElementById("videoContainer");
-      const btn = document.getElementById("hideCamBtn");
-      
-      if (isCamViewHidden) {
-        container.classList.add("hidden-view");
-        btn.innerText = "Show Feed";
-        log("Stealth Mode: Visual rendering disabled for battery savings.", "info");
-      } else {
-        container.classList.remove("hidden-view");
-        btn.innerText = "Hide Feed";
-        log("Camera Feed Visible.", "info");
-      }
-    }
+/* ======================= battery ======================= */
+if ('getBattery' in navigator) {
+  navigator.getBattery().then((b) => {
+    const upd = () => { $('batteryStat').textContent = Math.round(b.level * 100) + '%' + (b.charging ? ' \u26A1' : ''); };
+    upd(); b.addEventListener('levelchange', upd); b.addEventListener('chargingchange', upd);
+  }).catch(() => {});
+} else { $('batteryStat').textContent = 'n/a'; }
 
-    // --- LOGGING ---
-    const logBox = document.getElementById("log-output");
-    function log(msg, type = "") {
-      const timeStr = new Date().toISOString().substring(11, 19);
-      const line = document.createElement("div");
-      if (type === "error") line.className = "log-error";
-      if (type === "info") line.className = "log-info";
-      line.innerText = `[${timeStr}] ${msg}`;
-      logBox.appendChild(line);
-      logBox.scrollTop = logBox.scrollHeight;
-    }
-    function clearLogs() { logBox.innerText = ""; }
+/* ======================= gesture engine ======================= */
+const MP_HANDS = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
+const videoElement = $('webcam');
+const canvas = $('preview');
+const ctx = canvas.getContext('2d');
+const engine = { state: 'off', error: '', mode: settings.source === 'remote' ? 'remote' : 'local' };
+let engineGen = 0;
+let hands = null;
+let mpPromise = null;
+let stream = null, peer = null, remoteWs = null;
 
-    const sensSlider = document.getElementById("sensSlider");
-    const sensValDisplay = document.getElementById("sensVal");
-    sensSlider.addEventListener("input", (e) => {
-      sensValDisplay.innerText = parseFloat(e.target.value).toFixed(1);
-    });
+const loop = { active: false, id: 0, kind: '', lastTick: 0, lastMedia: -1, inflight: false, sentAt: 0, forceRaf: false, watchdog: 0 };
 
-    // --- WEBSOCKET & SCREEN SYNCING ---
-    let ws = null;
-    let isConnected = false;
-    let SCREEN_W = 1920;
-    let SCREEN_H = 1080;
+function loadMediaPipe() {
+  if (window.Hands) return Promise.resolve();
+  if (!mpPromise) {
+    mpPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = MP_HANDS + '/hands.js'; s.crossOrigin = 'anonymous'; s.async = true;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Could not download the hand tracking files. Connect this phone to the internet once; touchpad and keys still work.'));
+      document.head.appendChild(s);
+    }).catch((e) => { mpPromise = null; throw e; });
+  }
+  return mpPromise;
+}
 
-    function connectWebSocket(targetIp) {
-      if (!targetIp) return;
-      log(`Connecting to ws://${targetIp}:9999...`, "info");
-      
+const handsOptions = () => ({ maxNumHands: settings.twoHand ? 2 : 1, modelComplexity: settings.complexity,
+  minDetectionConfidence: settings.detect, minTrackingConfidence: settings.track });
+
+function initHands() {
+  if (hands) return;
+  hands = new window.Hands({ locateFile: (f) => `${MP_HANDS}/${f}` });
+  hands.setOptions(handsOptions());
+  hands.onResults(onResults);
+  log('Hand tracking model ready.');
+}
+function destroyHands() {
+  const h = hands; hands = null;
+  if (h) { try { Promise.resolve(h.close()).catch(() => {}); } catch {} }
+}
+
+/* ---- engine UI ---- */
+function previewActive() {
+  return engine.state === 'on' && !settings.hidePreview && activeTab === 'gestures' && !document.hidden;
+}
+function setEngineState(state, error = '') {
+  engine.state = state; engine.error = error;
+  renderEngine();
+}
+function renderEngine() {
+  const s = engine.state, on = s === 'on' || s === 'starting';
+  const box = $('engine');
+  box.dataset.on = String(s === 'on'); box.dataset.error = String(s === 'error');
+  const sw = $('engineSwitch');
+  sw.setAttribute('aria-checked', String(on));
+  const vp = $('viewport');
+  let state = 'off', text = 'Camera is off. Turn on hand tracking to control the cursor with gestures.', status = 'Off. Camera is not in use.';
+  if (s === 'starting') { state = 'starting'; text = 'Starting camera...'; status = 'Starting...'; }
+  else if (s === 'on') {
+    const fps = $('fpsStat').textContent;
+    status = settings.hidePreview ? 'Tracking with preview hidden' : 'Tracking' + (fps !== '--' ? ` at ${fps} fps` : '');
+    if (settings.hidePreview) { state = 'hidden'; text = 'Preview hidden. The camera is still tracking, but nothing is drawn on screen.'; } else state = 'live';
+  } else if (s === 'paused') { text = 'Paused while the full-screen touchpad is open. The camera is released.'; status = 'Paused. Camera is not in use.'; }
+  else if (s === 'error') { text = engine.error || 'Camera unavailable.'; status = 'Could not start'; }
+  vp.dataset.state = state;
+  $('vpText').textContent = text;
+  $('engineStatus').textContent = status;
+  const hb = $('hideBtn');
+  hb.querySelector('span').textContent = settings.hidePreview ? 'Show preview' : 'Hide preview';
+  hb.querySelector('use').setAttribute('href', settings.hidePreview ? '#i-eye' : '#i-eye-off');
+  hb.disabled = !on; $('flipBtn').disabled = s !== 'on';
+}
+
+async function setEngine(wantOn) {
+  const gen = ++engineGen;
+  if (!wantOn) {
+    teardownTracking(); setEngineState('off');
+    settings.engine = false; saveSettings(); log('Hand tracking off. Camera released.');
+    return;
+  }
+  settings.engine = true; saveSettings();
+  setEngineState('starting');
+  try {
+    await loadMediaPipe(); if (gen !== engineGen) return;
+    initHands();
+    await startSource(); if (gen !== engineGen) { teardownTracking(); return; }
+    setEngineState('on'); log('Hand tracking on.');
+  } catch (e) {
+    if (gen !== engineGen) return;
+    teardownTracking(); setEngineState('error', e.message);
+    log(`Hand tracking could not start: ${e.message}`, 'error');
+  }
+}
+function teardownTracking() {
+  stopSource(); releaseHold(); resetGestureState(); destroyHands();
+}
+$('engineSwitch').onclick = () => setEngine(!(engine.state === 'on' || engine.state === 'starting'));
+$('hideBtn').onclick = () => {
+  settings.hidePreview = !settings.hidePreview; saveSettings(); renderEngine();
+  if (settings.hidePreview) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  log(settings.hidePreview ? 'Preview hidden. No video is drawn, which saves battery.' : 'Preview shown.');
+};
+$('flipBtn').onclick = () => {
+  if (engine.mode === 'local') { settings.facing = settings.facing === 'user' ? 'environment' : 'user'; saveSettings(); log(`Switching to the ${settings.facing === 'user' ? 'front' : 'rear'} camera...`); restartSource(); }
+  else if (remoteWs && remoteWs.readyState === WebSocket.OPEN) { log('Switching remote camera...'); remoteWs.send(JSON.stringify({ type: 'COMMAND_SWITCH_CAMERA' })); }
+};
+
+/* ---- camera sources ---- */
+const frameMs = () => (1000 / settings.fps) * 0.9;
+
+function sourceDead() {
+  if (engine.mode !== 'local') return false;
+  const t = stream && stream.getVideoTracks()[0];
+  return !t || t.readyState === 'ended';
+}
+
+async function startSource() {
+  stopSource();
+  if (engine.mode === 'remote') return startRemote();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+    throw new Error('This browser blocks camera access on plain http pages. Open the page over HTTPS or localhost, or enable the "insecure origins treated as secure" flag for this address.');
+  const h = settings.res, w = Math.round(h * 4 / 3);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: {
+      facingMode: { ideal: settings.facing }, width: { ideal: w }, height: { ideal: h },
+      frameRate: { ideal: settings.fps, max: settings.fps } } });
+  } catch (e) {
+    const msg = e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow it in the browser site settings.'
+      : e.name === 'NotFoundError' ? 'No camera found on this device.' : e.message;
+    throw new Error(msg);
+  }
+  const track = stream.getVideoTracks()[0];
+  track.onended = () => { if (engine.state === 'on') { log('The camera stopped (another app may be using it).', 'warn'); setEngineState('error', 'Camera stopped. Turn hand tracking off and on to retry.'); stopSource(); } };
+  videoElement.srcObject = stream;
+  await videoElement.play();
+  startFrameLoop();
+  log(`Phone camera active (${settings.facing === 'user' ? 'front' : 'rear'}, ${w}x${h}, max ${settings.fps} fps)`);
+}
+
+function stopSource() {
+  stopFrameLoop();
+  if (stream) { stream.getTracks().forEach(t => { t.onended = null; t.stop(); }); stream = null; }
+  if (peer) { try { peer.close(); } catch {} peer = null; }
+  if (remoteWs) { const w = remoteWs; remoteWs = null; w.onclose = w.onmessage = w.onerror = null; try { w.close(); } catch {} }
+  if (videoElement.srcObject) videoElement.srcObject = null;
+}
+async function restartSource() {
+  if (engine.state !== 'on') return;
+  const gen = ++engineGen;
+  try { await startSource(); if (gen !== engineGen) return; setEngineState('on'); }
+  catch (e) { if (gen !== engineGen) return; teardownTracking(); setEngineState('error', e.message); log(`Camera restart failed: ${e.message}`, 'error'); }
+}
+
+function startRemote() {
+  return new Promise((resolve, reject) => {
+    const target = parseHost(settings.streamIp);
+    if (!target) return reject(new Error('Enter the remote stream address in Setup, for example 192.168.1.20:8080.'));
+    const hostPort = settings.streamIp.trim().replace(/^[a-z]+:\/\//i, '').split(/[\/?#]/)[0];
+    log(`Connecting to remote stream at ${hostPort}...`);
+    const viewerId = 'viewer_raw_' + Math.random().toString(36).slice(2, 11);
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let ws;
+    try { ws = new WebSocket(`${proto}//${hostPort}`); } catch (e) { return reject(e); }
+    remoteWs = ws;
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    const timeout = setTimeout(() => reject(new Error('Remote stream did not respond in 15 seconds.')), 15000);
+    ws.onopen = () => { log('Stream signaling connected'); ws.send(JSON.stringify({ type: 'VIEWER_JOIN', viewerId })); };
+    ws.onerror = () => { clearTimeout(timeout); reject(new Error('Could not reach the remote stream server.')); };
+    ws.onclose = () => { if (remoteWs === ws && engine.state === 'on') { log('Remote stream closed.', 'warn'); setEngineState('error', 'Remote stream closed. Turn hand tracking off and on to retry.'); stopSource(); } };
+    ws.onmessage = async (event) => {
+      let msg; try { msg = JSON.parse(event.data); } catch { return; }
+      if (msg.target && msg.target !== viewerId) return;
       try {
-        if (ws) ws.close();
-        ws = new WebSocket(`ws://${targetIp}:9999`);
+        if (msg.type === 'OFFER') {
+          peer = new RTCPeerConnection(rtcConfig);
+          peer.ontrack = (e) => {
+            if (videoElement.srcObject === e.streams[0]) return;
+            videoElement.srcObject = e.streams[0];
+            videoElement.play().catch(() => {});
+            clearTimeout(timeout); startFrameLoop(); log('Remote video stream received'); resolve();
+          };
+          peer.onicecandidate = (e) => { if (e.candidate && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'CANDIDATE', viewerId, candidate: e.candidate })); };
+          await peer.setRemoteDescription(new RTCSessionDescription(msg.offer));
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
+          ws.send(JSON.stringify({ type: 'ANSWER', viewerId, answer: peer.localDescription }));
+        } else if (msg.type === 'CANDIDATE' && peer) {
+          await peer.addIceCandidate(new RTCIceCandidate(msg.candidate));
+        }
+      } catch (e) { log(`Stream error: ${e.message}`, 'error'); }
+    };
+  });
+}
 
-        ws.onopen = () => {
-          isConnected = true;
-          const statusEl = document.getElementById("status");
-          statusEl.innerText = "Connected!";
-          statusEl.classList.add("status-connected");
-          log(`Connected successfully to ${targetIp}!`, "info");
-        };
+/* ---- frame loop: one frame per new camera frame, capped by Max FPS ---- */
+function startFrameLoop() {
+  stopFrameLoop();
+  loop.active = true; loop.lastTick = performance.now(); loop.lastMedia = -1; loop.forceRaf = false;
+  scheduleFrame();
+  loop.watchdog = setInterval(() => {
+    const now = performance.now();
+    if (loop.inflight && now - loop.sentAt > 5000) { log('Hand tracking stalled; resetting.', 'warn'); loop.inflight = false; }
+    if (!document.hidden && loop.kind === 'rvfc' && now - loop.lastTick > 2500) {
+      log('Video frame callback stalled; using timer fallback.', 'warn');
+      loop.forceRaf = true; cancelFrame(); scheduleFrame();
+    }
+  }, 2500);
+}
+function stopFrameLoop() {
+  loop.active = false; clearInterval(loop.watchdog); cancelFrame(); loop.inflight = false;
+}
+function cancelFrame() {
+  try { loop.kind === 'rvfc' ? videoElement.cancelVideoFrameCallback(loop.id) : cancelAnimationFrame(loop.id); } catch {}
+}
+function scheduleFrame() {
+  if (!loop.active) return;
+  if (!loop.forceRaf && 'requestVideoFrameCallback' in videoElement) { loop.kind = 'rvfc'; loop.id = videoElement.requestVideoFrameCallback(onVideoFrame); }
+  else { loop.kind = 'raf'; loop.id = requestAnimationFrame(onVideoFrame); }
+}
+function onVideoFrame(_now, meta) {
+  if (!loop.active) return;
+  loop.lastTick = performance.now();
+  const mt = meta ? meta.mediaTime : videoElement.currentTime;
+  if (mt !== loop.lastMedia) { loop.lastMedia = mt; feed(); }
+  scheduleFrame();
+}
+function feed() {
+  if (!hands || loop.inflight || videoElement.readyState < 2) return;
+  const t = performance.now();
+  if (t - loop.sentAt < frameMs()) return;
+  loop.inflight = true; loop.sentAt = t;
+  hands.send({ image: videoElement })
+    .catch((e) => logThrottled('send', `Frame error: ${e && e.message || e}`, 'error', 10000))
+    .finally(() => { loop.inflight = false; });
+}
 
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "init" && data.screen_w && data.screen_h) {
-              SCREEN_W = data.screen_w;
-              SCREEN_H = data.screen_h;
-              log(`Synced PC Screen Resolution: ${SCREEN_W}x${SCREEN_H}`, "info");
-            }
-          } catch(e) {}
-        };
+/* ---- gestures (logic unchanged) ---- */
+const PINCH_THRESHOLD = 0.05, CLICK_COOLDOWN = 350, MEDIA_COOLDOWN = 700, SCROLL_COOLDOWN = 60;
+const VOL_STEP_NORM = 0.03, SWIPE_THRESHOLD_NORM = 0.08, EDGE_THRESHOLD_NORM = 0.06, CONTINUOUS_SCROLL_SPEED = 1;
+let lastClickTime = 0, lastMediaTime = 0, lastScrollTime = 0, lastLhTime = 0;
+let isHolding = false, prevScrollY = 0, prevMediaX = 0, prevMediaY = 0, prevZoomDist = 0;
+let smoothX = null, smoothY = null;
 
-        ws.onclose = () => {
-          isConnected = false;
-          const statusEl = document.getElementById("status");
-          statusEl.innerText = "Disconnected";
-          statusEl.classList.remove("status-connected");
-          log("WebSocket connection closed.");
-        };
+function releaseHold() { if (isHolding) { sendCmd({ cmd: 'mouseup', button: 'left' }); isHolding = false; } }
+function resetGestureState() { smoothX = smoothY = null; prevScrollY = prevMediaX = prevMediaY = prevZoomDist = 0; }
 
-        ws.onerror = () => { log("WebSocket Error: Check IP / Firewall", "error"); };
-      } catch (err) {
-        log(`WS Exception: ${err.message}`, "error");
+function getSmoothedPos(rawX, rawY) {
+  if (smoothX === null || smoothY === null) { smoothX = rawX; smoothY = rawY; return { x: Math.round(smoothX), y: Math.round(smoothY) }; }
+  const dx = rawX - smoothX, dy = rawY - smoothY, dist = Math.hypot(dx, dy);
+  if (dist < 2.5) return { x: Math.round(smoothX), y: Math.round(smoothY) };
+  const factor = dist < 15 ? 0.12 : (dist > 50 ? 0.85 : 0.12 + ((dist - 15) / 35) * (0.85 - 0.12));
+  smoothX += factor * dx; smoothY += factor * dy;
+  return { x: Math.round(smoothX), y: Math.round(smoothY) };
+}
+
+const HAND_LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+function drawPreview(results) {
+  const w = videoElement.videoWidth || 320, h = videoElement.videoHeight || 240;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  ctx.drawImage(videoElement, 0, 0, w, h);
+  if (!results.multiHandLandmarks) return;
+  for (const lm of results.multiHandLandmarks) {
+    ctx.strokeStyle = 'rgba(110,231,200,.85)'; ctx.lineWidth = 2; ctx.beginPath();
+    for (const [a, b] of HAND_LINKS) { ctx.moveTo(lm[a].x * w, lm[a].y * h); ctx.lineTo(lm[b].x * w, lm[b].y * h); }
+    ctx.stroke();
+    ctx.fillStyle = '#e8f1f0';
+    for (const p of lm) { ctx.beginPath(); ctx.arc(p.x * w, p.y * h, 2.5, 0, 6.2832); ctx.fill(); }
+    const pt = lm[9];
+    ctx.fillStyle = '#6ee7c8'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(pt.x * w, pt.y * h, 6, 0, 6.2832); ctx.fill(); ctx.stroke();
+  }
+}
+
+let frameCount = 0, lastFpsTime = Date.now(), lastInference = 0;
+function onResults(results) {
+  if (engine.state !== 'on' && engine.state !== 'starting') return;
+  if (engine.state === 'starting') setEngineState('on');
+  lastInference = performance.now() - loop.sentAt;
+
+  frameCount++;
+  const nowTime = Date.now();
+  if (nowTime - lastFpsTime >= 1000) {                       // update the DOM once per second
+    $('fpsStat').textContent = frameCount; $('latencyStat').textContent = Math.round(lastInference);
+    frameCount = 0; lastFpsTime = nowTime;
+    if (!settings.hidePreview) $('engineStatus').textContent = `Tracking at ${$('fpsStat').textContent} fps`;
+  }
+  if (previewActive()) drawPreview(results);
+
+  try {
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+      releaseHold(); smoothX = smoothY = null; return;
+    }
+
+    const targetAspect = 16 / 9, cameraAspect = 3 / 4;
+    const cropYPercent = (1.0 - (cameraAspect / targetAspect)) / 2.0;
+    const minY = cropYPercent, maxY = 1.0 - cropYPercent;
+    function getNormPoint(lm) {
+      if (!lm) return { x: 0, y: 0 };
+      const xNorm = 1.0 - lm.x;
+      const yCropped = (lm.y - minY) / (maxY - minY);
+      return { x: xNorm, y: Math.max(0, Math.min(1, yCropped)) };
+    }
+
+    let rightHand = null, leftHand = null;
+    if (results.multiHandedness && results.multiHandedness.length > 0) {
+      for (let i = 0; i < results.multiHandedness.length; i++) {
+        const label = results.multiHandedness[i].label;
+        if (label === 'Right') rightHand = results.multiHandLandmarks[i];
+        if (label === 'Left') leftHand = results.multiHandLandmarks[i];
       }
     }
+    if (!rightHand && results.multiHandLandmarks[0]) rightHand = results.multiHandLandmarks[0];
 
-    function manualConnect() {
-      const ip = document.getElementById("pcIp").value.trim();
-      if (!ip) return alert("Please enter PC IP address");
-      connectWebSocket(ip);
+    const now = Date.now();
+
+    if (rightHand && leftHand && settings.twoHand) {
+      const rhPalm = getNormPoint(rightHand[5]), lhPalm = getNormPoint(leftHand[5]);
+      const zoomDist = Math.hypot(rhPalm.x - lhPalm.x, rhPalm.y - lhPalm.y);
+      const rhOpen = rightHand[8].y < rightHand[6].y && rightHand[12].y < rightHand[10].y;
+      const lhOpen = leftHand[8].y < leftHand[6].y && leftHand[12].y < leftHand[10].y;
+      if (rhOpen && lhOpen) {
+        if (prevZoomDist !== 0 && (now - lastLhTime) > 250) {
+          const diffZoom = zoomDist - prevZoomDist;
+          if (diffZoom > 0.08) { sendCmd({ cmd: 'hotkey', keys: ['ctrl', '+'] }); lastLhTime = now; }
+          else if (diffZoom < -0.08) { sendCmd({ cmd: 'hotkey', keys: ['ctrl', '-'] }); lastLhTime = now; }
+        }
+        prevZoomDist = zoomDist;
+      } else { prevZoomDist = 0; }
     }
 
-    function sendCmd(payload) {
-      if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(payload));
+    if (rightHand) {
+      const landmarks = rightHand;
+      const trackingPt = getNormPoint(landmarks[9]);
+      const thumb = getNormPoint(landmarks[4]);
+      const pinky = getNormPoint(landmarks[20]);
+      const index = landmarks[8], middle = landmarks[12], ring = landmarks[16], pinkyLm = landmarks[20];
+      if (!index || !middle || !ring || !pinkyLm) return;
+
+      const sensitivity = settings.sens;
+      const margin = 0.2 / (sensitivity / 4.0);
+      const minM = Math.max(0.0, margin), maxM = Math.min(1.0, 1.0 - margin);
+      const normX = Math.max(0, Math.min(1, (trackingPt.x - minM) / (maxM - minM)));
+      const normY = Math.max(0, Math.min(1, (trackingPt.y - minM) / (maxM - minM)));
+      const smoothed = getSmoothedPos(normX * SCREEN_W, normY * SCREEN_H);
+      const currX = smoothed.x, currY = smoothed.y;
+
+      const indexUp = index.y < landmarks[6].y;
+      const indexDown = index.y > landmarks[5].y;
+      const indexHalf = landmarks[6].y <= index.y && index.y <= landmarks[5].y;
+      const middleExtended = middle.y < landmarks[10].y;
+      const ringExtended = ring.y < landmarks[14].y;
+      const pinkyExtended = pinkyLm.y < landmarks[18].y;
+      const isPinched = Math.hypot(pinky.x - thumb.x, pinky.y - thumb.y) < PINCH_THRESHOLD;
+
+      if (indexUp && middleExtended && ringExtended && !pinkyExtended) {
+        releaseHold();
+        prevScrollY = 0;
+        if (prevMediaX === 0) { prevMediaX = trackingPt.x; prevMediaY = trackingPt.y; }
+        const diffX = trackingPt.x - prevMediaX;
+        const diffY = prevMediaY - trackingPt.y;
+        if (Math.abs(diffY) > VOL_STEP_NORM) {
+          sendCmd({ cmd: 'press', key: diffY > 0 ? 'volumeup' : 'volumedown' });
+          prevMediaY = trackingPt.y;
+        }
+        if (Math.abs(diffX) > SWIPE_THRESHOLD_NORM && (now - lastMediaTime) > MEDIA_COOLDOWN) {
+          sendCmd({ cmd: 'press', key: diffX > 0 ? 'nexttrack' : 'prevtrack' });
+          lastMediaTime = now; prevMediaX = trackingPt.x;
+        } else if (Math.abs(diffX) < 0.03) { prevMediaX = trackingPt.x; }
       }
-    }
-
-    // --- BATTERY & PERFORMANCE MONITOR ---
-    let frameCount = 0;
-    let lastFpsTime = Date.now();
-    
-    if ('getBattery' in navigator) {
-      navigator.getBattery().then(battery => {
-        function updateBattery() {
-          const level = Math.round(battery.level * 100);
-          const charging = battery.charging ? "⚡" : "";
-          document.getElementById("batteryStat").innerText = `Battery: ${level}% ${charging}`;
-        }
-        updateBattery();
-        battery.addEventListener('levelchange', updateBattery);
-        battery.addEventListener('chargingchange', updateBattery);
-      });
-    }
-
-    // --- VIRTUAL TOUCHPAD LOGIC (1-Finger Move, 2-Finger Scroll) ---
-    function setupTouchpad(elementId) {
-      const tp = document.getElementById(elementId);
-      if (!tp) return;
-
-      let lastX = 0, lastY = 0;
-      let last2Y = 0;
-      let startTime = 0;
-      let startX = 0, startY = 0;
-
-      tp.addEventListener("touchstart", (e) => {
-        if (e.touches.length === 1) {
-          lastX = e.touches[0].clientX;
-          lastY = e.touches[0].clientY;
-          startX = lastX;
-          startY = lastY;
-          startTime = Date.now();
-        } else if (e.touches.length === 2) {
-          last2Y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        }
-      }, { passive: false });
-
-      tp.addEventListener("touchmove", (e) => {
-        e.preventDefault();
-        if (!isConnected) return;
-
-        if (e.touches.length === 1) {
-          const currentX = e.touches[0].clientX;
-          const currentY = e.touches[0].clientY;
-          const dx = (currentX - lastX) * 1.8;
-          const dy = (currentY - lastY) * 1.8;
-
-          if (Math.hypot(dx, dy) >= 0.5) {
-            sendCmd({ cmd: "move_rel", dx: Math.round(dx), dy: Math.round(dy) });
-            lastX = currentX;
-            lastY = currentY;
-          }
-        } else if (e.touches.length === 2) {
-          const current2Y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-          const dy = current2Y - last2Y;
-
-          if (Math.abs(dy) > 3) {
-            const amount = Math.round(-dy / 5);
-            if (amount !== 0) {
-              sendCmd({ cmd: "scroll", amount: amount });
-              last2Y = current2Y;
-            }
-          }
-        }
-      }, { passive: false });
-
-      tp.addEventListener("touchend", (e) => {
-        if (e.touches.length === 0) {
-          const duration = Date.now() - startTime;
-          const dist = Math.hypot(lastX - startX, lastY - startY);
-          if (duration < 200 && dist < 8) {
-            sendCmd({ cmd: "click", button: "left" });
-          }
-        }
-      });
-    }
-
-    setupTouchpad("touchpad");
-    setupTouchpad("touchpadFs");
-
-    // --- MEDIAPIPE GESTURE & ENGINE (ORIGINAL CODES & CONSTANTS) ---
-    const PINCH_THRESHOLD = 0.05;
-    const CLICK_COOLDOWN = 350;
-    const MEDIA_COOLDOWN = 700;
-    const SCROLL_COOLDOWN = 60;
-    const VOL_STEP_NORM = 0.03;
-    const SWIPE_THRESHOLD_NORM = 0.08;
-    const EDGE_THRESHOLD_NORM = 0.06;
-    const CONTINUOUS_SCROLL_SPEED = 1;
-
-    let lastClickTime = 0, lastMediaTime = 0, lastScrollTime = 0, lastLhTime = 0;
-    let isHolding = false, prevScrollY = 0, prevMediaX = 0, prevMediaY = 0, prevZoomDist = 0;
-
-    let smoothX = null, smoothY = null;
-
-    function getSmoothedPos(rawX, rawY) {
-      if (smoothX === null || smoothY === null) {
-        smoothX = rawX; smoothY = rawY;
-        return { x: Math.round(smoothX), y: Math.round(smoothY) };
-      }
-      const dx = rawX - smoothX; const dy = rawY - smoothY;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist < 2.5) return { x: Math.round(smoothX), y: Math.round(smoothY) };
-
-      let factor = dist < 15 ? 0.12 : (dist > 50 ? 0.85 : 0.12 + ((dist - 15) / 35) * (0.85 - 0.12));
-      smoothX += factor * dx; smoothY += factor * dy;
-      return { x: Math.round(smoothX), y: Math.round(smoothY) };
-    }
-
-    const videoElement = document.getElementById('webcam');
-    const canvasElement = document.getElementById('outputCanvas');
-    const canvasCtx = canvasElement.getContext('2d');
-    let hands = null;
-
-    try {
-      hands = new Hands({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-      });
-      hands.setOptions({
-        maxNumHands: 1, modelComplexity: 0,
-        minDetectionConfidence: 0.3, minTrackingConfidence: 0.3
-      });
-      hands.onResults(onResults);
-      log("MediaPipe Hands loaded.", "info");
-    } catch (e) {
-      log(`MediaPipe Load Failed: ${e.message}`, "error");
-    }
-
-    function updateHandMode() {
-      if (!hands) return;
-      const enableLeft = document.getElementById("leftHandToggle").checked;
-      hands.setOptions({ maxNumHands: enableLeft ? 2 : 1 });
-      log(`Hand Mode: ${enableLeft ? "2 Hands" : "1 Hand"}`);
-    }
-
-    let currentResHeight = 240;
-
-    function applyPerformanceSettings() {
-      if (!hands) return;
-      const complexity = parseInt(document.getElementById("modelComplexitySelect").value);
-      const detectConf = parseFloat(document.getElementById("detectConfSlider").value);
-      const trackConf = parseFloat(document.getElementById("trackConfSlider").value);
-      const newResHeight = parseInt(document.getElementById("resSelect").value);
-      const enableLeft = document.getElementById("leftHandToggle").checked;
-
-      hands.setOptions({
-        maxNumHands: enableLeft ? 2 : 1,
-        modelComplexity: complexity,
-        minDetectionConfidence: detectConf,
-        minTrackingConfidence: trackConf
-      });
-
-      log(`Applied MediaPipe Config: Comp=${complexity}, Detect=${detectConf}, Track=${trackConf}`, "info");
-
-      if (newResHeight !== currentResHeight) {
-        currentResHeight = newResHeight;
-        log(`Updating Camera Resolution to ${Math.round(newResHeight * (4/3))}x${newResHeight}...`, "info");
-        startCamera(currentCameraFacing);
-      }
-    }
-
-    function onResults(results) {
-      const startTime = performance.now();
-      
-      // Update FPS stats
-      frameCount++;
-      const nowTime = Date.now();
-      if (nowTime - lastFpsTime >= 1000) {
-        document.getElementById("fpsStat").innerText = `FPS: ${frameCount}`;
-        frameCount = 0;
-        lastFpsTime = nowTime;
-      }
-
-      // Visual Overlay Drawing
-      if (!isCamViewHidden) {
-        canvasElement.width = videoElement.videoWidth || 320;
-        canvasElement.height = videoElement.videoHeight || 240;
-        canvasCtx.save();
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-        if (results.multiHandLandmarks) {
-          for (const landmarks of results.multiHandLandmarks) {
-            // Draw tracking index point
-            const pt = landmarks[9];
-            canvasCtx.fillStyle = '#00ff66';
-            canvasCtx.beginPath();
-            canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 6, 0, 2 * Math.PI);
-            canvasCtx.fill();
-          }
-        }
-        canvasCtx.restore();
-      }
-
-      try {
-        if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-          if (isHolding) { sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false; }
-          smoothX = null; smoothY = null;
-          return;
-        }
-
-        const targetAspect = 16 / 9;
-        const cameraAspect = 3 / 4;
-        const cropYPercent = (1.0 - (cameraAspect / targetAspect)) / 2.0; 
-        const minY = cropYPercent;
-        const maxY = 1.0 - cropYPercent;
-
-        function getNormPoint(lm) {
-          if (!lm) return { x: 0, y: 0 };
-          const xNorm = 1.0 - lm.x;
-          const yCropped = (lm.y - minY) / (maxY - minY);
-          return { x: xNorm, y: Math.max(0, Math.min(1, yCropped)) };
-        }
-
-        let rightHand = null, leftHand = null;
-
-        if (results.multiHandedness && results.multiHandedness.length > 0) {
-          for (let i = 0; i < results.multiHandedness.length; i++) {
-            const label = results.multiHandedness[i].label;
-            if (label === "Right") rightHand = results.multiHandLandmarks[i];
-            if (label === "Left") leftHand = results.multiHandLandmarks[i];
-          }
-        }
-        if (!rightHand && results.multiHandLandmarks[0]) rightHand = results.multiHandLandmarks[0];
-
-        const now = Date.now();
-
-        if (rightHand && leftHand && document.getElementById("leftHandToggle").checked) {
-          const rhPalm = getNormPoint(rightHand[5]);
-          const lhPalm = getNormPoint(leftHand[5]);
-          const zoomDist = Math.hypot(rhPalm.x - lhPalm.x, rhPalm.y - lhPalm.y);
-
-          const rhOpen = rightHand[8].y < rightHand[6].y && rightHand[12].y < rightHand[10].y;
-          const lhOpen = leftHand[8].y < leftHand[6].y && leftHand[12].y < leftHand[10].y;
-
-          if (rhOpen && lhOpen) {
-            if (prevZoomDist !== 0 && (now - lastLhTime) > 250) {
-              const diffZoom = zoomDist - prevZoomDist;
-              if (diffZoom > 0.08) { sendCmd({ cmd: "hotkey", keys: ["ctrl", "+"] }); lastLhTime = now; }
-              else if (diffZoom < -0.08) { sendCmd({ cmd: "hotkey", keys: ["ctrl", "-"] }); lastLhTime = now; }
-            }
-            prevZoomDist = zoomDist;
-          } else { prevZoomDist = 0; }
-        }
-
-        if (rightHand) {
-          const landmarks = rightHand;
-          const trackingPt = getNormPoint(landmarks[9]);
-          const thumb = getNormPoint(landmarks[4]);
-          const pinky = getNormPoint(landmarks[20]);
-
-          const index = landmarks[8], middle = landmarks[12], ring = landmarks[16], pinkyLm = landmarks[20];
-          if (!index || !middle || !ring || !pinkyLm) return;
-
-          const sensitivity = parseFloat(sensSlider.value);
-          const margin = 0.2 / (sensitivity / 4.0); 
-          const minM = Math.max(0.0, margin);
-          const maxM = Math.min(1.0, 1.0 - margin);
-
-          const normX = Math.max(0, Math.min(1, (trackingPt.x - minM) / (maxM - minM)));
-          const normY = Math.max(0, Math.min(1, (trackingPt.y - minM) / (maxM - minM)));
-
-          const smoothed = getSmoothedPos(normX * SCREEN_W, normY * SCREEN_H);
-          const currX = smoothed.x, currY = smoothed.y;
-
-          const indexUp = index.y < landmarks[6].y;
-          const indexDown = index.y > landmarks[5].y;
-          const indexHalf = landmarks[6].y <= index.y && index.y <= landmarks[5].y;
-
-          const middleExtended = middle.y < landmarks[10].y;
-          const ringExtended = ring.y < landmarks[14].y;
-          const pinkyExtended = pinkyLm.y < landmarks[18].y;
-
-          const isPinched = Math.hypot(pinky.x - thumb.x, pinky.y - thumb.y) < PINCH_THRESHOLD;
-
-          if (indexUp && middleExtended && ringExtended && !pinkyExtended) {
-            if (isHolding) { sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false; }
-            prevScrollY = 0;
-            if (prevMediaX === 0) { prevMediaX = trackingPt.x; prevMediaY = trackingPt.y; }
-
-            const diffX = trackingPt.x - prevMediaX;
-            const diffY = prevMediaY - trackingPt.y;
-
-            if (Math.abs(diffY) > VOL_STEP_NORM) {
-              sendCmd({ cmd: "press", key: diffY > 0 ? "volumeup" : "volumedown" });
-              prevMediaY = trackingPt.y;
-            }
-
-            if (Math.abs(diffX) > SWIPE_THRESHOLD_NORM && (now - lastMediaTime) > MEDIA_COOLDOWN) {
-              sendCmd({ cmd: "press", key: diffX > 0 ? "nexttrack" : "prevtrack" });
-              lastMediaTime = now; prevMediaX = trackingPt.x;
-            } else if (Math.abs(diffX) < 0.03) { prevMediaX = trackingPt.x; }
-          }
-          else if (indexUp && middleExtended && !ringExtended) {
-            if (isHolding) { sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false; }
-            prevMediaX = 0; prevMediaY = 0;
-            const indexYNorm = getNormPoint(index).y;
-
-            if ((now - lastScrollTime) > SCROLL_COOLDOWN) {
-              if (indexYNorm < (0.05 + EDGE_THRESHOLD_NORM)) {
-                sendCmd({ cmd: "scroll", amount: CONTINUOUS_SCROLL_SPEED });
-                prevScrollY = 0; lastScrollTime = now;
-              } else if (indexYNorm > (0.95 - EDGE_THRESHOLD_NORM)) {
-                sendCmd({ cmd: "scroll", amount: -CONTINUOUS_SCROLL_SPEED });
-                prevScrollY = 0; lastScrollTime = now;
-              } else {
-                if (prevScrollY !== 0) {
-                  const diffY = prevScrollY - indexYNorm;
-                  if (Math.abs(diffY) > 0.015) { 
-                    const ticks = Math.sign(diffY) * Math.min(3, Math.max(1, Math.round(Math.abs(diffY) * 40)));
-                    sendCmd({ cmd: "scroll", amount: ticks });
-                    lastScrollTime = now;
-                  }
-                }
-                prevScrollY = indexYNorm;
+      else if (indexUp && middleExtended && !ringExtended) {
+        releaseHold();
+        prevMediaX = 0; prevMediaY = 0;
+        const indexYNorm = getNormPoint(index).y;
+        if ((now - lastScrollTime) > SCROLL_COOLDOWN) {
+          if (indexYNorm < (0.05 + EDGE_THRESHOLD_NORM)) {
+            sendCmd({ cmd: 'scroll', amount: CONTINUOUS_SCROLL_SPEED }); prevScrollY = 0; lastScrollTime = now;
+          } else if (indexYNorm > (0.95 - EDGE_THRESHOLD_NORM)) {
+            sendCmd({ cmd: 'scroll', amount: -CONTINUOUS_SCROLL_SPEED }); prevScrollY = 0; lastScrollTime = now;
+          } else {
+            if (prevScrollY !== 0) {
+              const diffY = prevScrollY - indexYNorm;
+              if (Math.abs(diffY) > 0.015) {
+                const ticks = Math.sign(diffY) * Math.min(3, Math.max(1, Math.round(Math.abs(diffY) * 40)));
+                sendCmd({ cmd: 'scroll', amount: ticks }); lastScrollTime = now;
               }
             }
-          }
-          else {
-            prevScrollY = 0; prevMediaX = 0; prevMediaY = 0;
-
-            if (indexUp) sendCmd({ cmd: "move", x: currX, y: currY });
-
-            if (indexUp && isPinched) {
-              if (!isHolding) { sendCmd({ cmd: "mousedown", button: "left" }); isHolding = true; }
-            } else if (isHolding) {
-              sendCmd({ cmd: "mouseup", button: "left" }); isHolding = false;
-            }
-
-            if (indexHalf && isPinched && (now - lastClickTime) > CLICK_COOLDOWN) {
-              sendCmd({ cmd: "doubleclick" }); lastClickTime = now;
-            }
-            else if (indexDown && isPinched && (now - lastClickTime) > CLICK_COOLDOWN) {
-              sendCmd({ cmd: "click", button: "right" }); lastClickTime = now;
-            }
+            prevScrollY = indexYNorm;
           }
         }
-      } catch (err) {
-        log(`Tracking Frame Error: ${err.message}`, "error");
       }
-
-      const latency = Math.round(performance.now() - startTime);
-      document.getElementById("latencyStat").innerText = `Latency: ${latency} ms`;
-    }
-
-    let currentCameraFacing = "user";
-    let cameraInstance = null;
-
-    function startCamera(facingMode) {
-      if (cameraInstance) cameraInstance.stop();
-
-      const resHeight = currentResHeight;
-      const resWidth = Math.round(resHeight * (4 / 3));
-
-      try {
-        cameraInstance = new Camera(videoElement, {
-          onFrame: async () => {
-            if (hands) await hands.send({ image: videoElement });
-          },
-          width: resWidth, height: resHeight, facingMode: facingMode
-        });
-        cameraInstance.start();
-        log(`Camera feed active (${facingMode}, ${resWidth}x${resHeight}).`, "info");
-      } catch (e) {
-        log(`Camera Error: ${e.message}`, "error");
+      else {
+        prevScrollY = 0; prevMediaX = 0; prevMediaY = 0;
+        if (indexUp) sendCmd({ cmd: 'move', x: currX, y: currY });
+        if (indexUp && isPinched) {
+          if (!isHolding) { sendCmd({ cmd: 'mousedown', button: 'left' }); isHolding = true; }
+        } else releaseHold();
+        if (indexHalf && isPinched && (now - lastClickTime) > CLICK_COOLDOWN) { sendCmd({ cmd: 'doubleclick' }); lastClickTime = now; }
+        else if (indexDown && isPinched && (now - lastClickTime) > CLICK_COOLDOWN) { sendCmd({ cmd: 'click', button: 'right' }); lastClickTime = now; }
       }
     }
+  } catch (err) {
+    logThrottled('track', `Tracking error: ${err.message}`, 'error', 10000);
+  }
+}
 
-    function toggleCamera() {
-      currentCameraFacing = currentCameraFacing === "user" ? "environment" : "user";
-      log(`Switching camera to: ${currentCameraFacing}...`, "info");
-      startCamera(currentCameraFacing);
-    }
+/* ======================= settings UI ======================= */
+const sens = $('sensSlider');
+sens.addEventListener('input', () => { settings.sens = parseFloat(sens.value); $('sensVal').textContent = settings.sens.toFixed(1); });
+sens.addEventListener('change', saveSettings);
+$('twoHand').onclick = () => {
+  settings.twoHand = !settings.twoHand; saveSettings();
+  $('twoHand').setAttribute('aria-checked', String(settings.twoHand));
+  if (hands) hands.setOptions(handsOptions());
+  log(`Hand mode: ${settings.twoHand ? 'two hands' : 'single hand'}`);
+};
+$('detectSlider').addEventListener('input', (e) => { $('detectVal').textContent = parseFloat(e.target.value).toFixed(2); });
+$('trackSlider').addEventListener('input', (e) => { $('trackVal').textContent = parseFloat(e.target.value).toFixed(2); });
+$('applyPerf').onclick = () => {
+  const prev = { res: settings.res, fps: settings.fps };
+  settings.res = parseInt($('resSelect').value, 10);
+  settings.fps = parseInt($('fpsSelect').value, 10);
+  settings.complexity = parseInt($('modelSelect').value, 10);
+  settings.detect = parseFloat($('detectSlider').value);
+  settings.track = parseFloat($('trackSlider').value);
+  saveSettings();
+  if (hands) hands.setOptions(handsOptions());
+  log(`Performance applied: ${settings.res}p, max ${settings.fps} fps, model ${settings.complexity}, detect ${settings.detect}, track ${settings.track}`);
+  if ((prev.res !== settings.res || prev.fps !== settings.fps) && engine.mode === 'local') restartSource();
+};
 
-    startCamera("user");
+function setSource(mode) {
+  engine.mode = mode; settings.source = mode; saveSettings();
+  $('srcLocal').setAttribute('aria-pressed', String(mode === 'local'));
+  $('srcRemote').setAttribute('aria-pressed', String(mode === 'remote'));
+  $('remoteBox').hidden = mode !== 'remote';
+}
+$('srcLocal').onclick = () => { if (engine.mode === 'local') return; setSource('local'); if (engine.state === 'on') restartSource(); };
+$('srcRemote').onclick = () => setSource('remote');
+$('loadStream').onclick = () => {
+  settings.streamIp = $('streamIp').value.trim(); saveSettings(); setSource('remote');
+  if (engine.state === 'on') restartSource(); else setEngine(true);
+  showTab('gestures');
+};
 
-    window.addEventListener("DOMContentLoaded", () => {
-      const currentHost = window.location.hostname;
-      if (currentHost && currentHost !== "localhost" && currentHost !== "127.0.0.1") {
-        document.getElementById("pcIp").value = currentHost;
-        connectWebSocket(currentHost);
-      } else {
-        log("Opened via localhost. Enter PC IP manually in menu.", "info");
-      }
-    });
-  </script>
+/* ======================= lifecycle ======================= */
+window.addEventListener('pagehide', () => { releaseHold(); stopSource(); closeConn(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('fsPad').classList.contains('on')) $('closePad').click(); });
+
+(function init() {
+  // PIN pairing link: http://pc-ip:8000/#pin=XXXXXXXX (the hash never leaves the phone)
+  const m = /[#&]pin=([A-Za-z0-9-]{4,16})/.exec(location.hash);
+  if (m) { store.set('airmouse.pin', m[1].toUpperCase()); history.replaceState(null, '', location.pathname + location.search); log('PIN saved from pairing link.'); }
+
+  $('sensSlider').value = settings.sens; $('sensVal').textContent = Number(settings.sens).toFixed(1);
+  $('twoHand').setAttribute('aria-checked', String(!!settings.twoHand));
+  $('resSelect').value = String(settings.res); $('fpsSelect').value = String(settings.fps); $('modelSelect').value = String(settings.complexity);
+  $('detectSlider').value = settings.detect; $('detectVal').textContent = Number(settings.detect).toFixed(2);
+  $('trackSlider').value = settings.track; $('trackVal').textContent = Number(settings.track).toFixed(2);
+  $('streamIp').value = settings.streamIp || '';
+  $('pcPin').value = getPin();
+  setSource(engine.mode);
+  renderEngine();
+  setConn('offline');
+  log('Air Mouse ready.');
+
+  const pageHost = location.hostname;
+  const hasHost = pageHost && pageHost !== 'localhost' && pageHost !== '127.0.0.1';
+  const host = hasHost ? pageHost : settings.pcIp;
+  $('pcIp').value = host || '';
+  if (host && getPin()) connect(host);
+  else { showTab('setup'); log(host ? 'Enter the PIN to connect.' : 'Enter your PC address and PIN to connect.', 'warn'); }
+
+  if (settings.engine) setEngine(true);
+})();
+})();
+</script>
 </body>
 </html>
