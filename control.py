@@ -458,15 +458,15 @@ class CommandQueue:
 _mouse_event_ready = False
 
 
-def _win_mouse_event(flags, data):
-    """Raw wheel event so scrolling can be smaller than one full notch."""
+def _win_mouse_event(flags, data, dx=0, dy=0):
+    """Raw mouse_event: real input (wheel notches smaller than 1, and moves that apps see as dragging)."""
     global _mouse_event_ready
     fn = ctypes.windll.user32.mouse_event
     if not _mouse_event_ready:
         fn.argtypes = [ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_size_t]
         fn.restype = None
         _mouse_event_ready = True
-    fn(flags, 0, 0, data & 0xFFFFFFFF, 0)
+    fn(flags, dx, dy, data & 0xFFFFFFFF, 0)
 
 
 class InputWorker(threading.Thread):
@@ -477,6 +477,38 @@ class InputWorker(threading.Thread):
         self.keyboard = kb_ctl.Controller()
         self._held = set()
         self._rem = [0.0, 0.0]          # fractional scroll carried over (non-Windows)
+
+    def _cursor_pos(self):
+        if sys.platform == "win32":
+            try:
+                from ctypes import wintypes
+                pt = wintypes.POINT()
+                if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
+                    return pt.x, pt.y
+            except Exception:
+                pass
+        return self.mouse.position
+
+    def _move_to(self, x, y):
+        """Move the cursor with a real input event.
+
+        SetCursorPos (what pynput uses) does not look like mouse movement to many apps,
+        so click-and-drag selection in PDF viewers, browsers etc. did nothing.
+        """
+        if sys.platform == "win32":
+            try:
+                u = ctypes.windll.user32
+                vx, vy, vw, vh = (u.GetSystemMetrics(i) for i in (76, 77, 78, 79))   # virtual desktop
+                if vw > 0 and vh > 0:
+                    x = max(vx, min(vx + vw - 1, int(x)))
+                    y = max(vy, min(vy + vh - 1, int(y)))
+                    nx = min(65535, ((x - vx) * 65536 + vw - 1) // vw)
+                    ny = min(65535, ((y - vy) * 65536 + vh - 1) // vh)
+                    _win_mouse_event(0x0001 | 0x8000 | 0x4000, 0, nx, ny)   # MOVE | ABSOLUTE | VIRTUALDESK
+                    return
+            except Exception:
+                pass
+        self.mouse.position = (int(x), int(y))
 
     def _wheel(self, vertical, horizontal=0.0):
         """Scroll by (possibly fractional) wheel notches. Positive = up / right."""
@@ -509,9 +541,10 @@ class InputWorker(threading.Thread):
     def _execute(self, c):
         name = c["cmd"]
         if name == "move":
-            self.mouse.position = (c["x"], c["y"])
+            self._move_to(c["x"], c["y"])
         elif name == "move_rel":
-            self.mouse.move(c["dx"], c["dy"])
+            x, y = self._cursor_pos()
+            self._move_to(x + c["dx"], y + c["dy"])
         elif name == "click":
             self.mouse.click(BUTTON_MAP[c["button"]], 1)
         elif name == "doubleclick":

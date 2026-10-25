@@ -280,7 +280,7 @@ details.guide[open] summary::after{content:"\2212"}
     <h2>Touchpad</h2>
     <div class="pad" id="touchpad">
       <svg class="i" style="width:28px;height:28px"><use href="#i-pointer"/></svg>
-      <span>One finger moves. Tap to click.<br><b>To select: tap twice, but keep your finger down on the 2nd tap and move.</b><br>Two fingers scroll or pinch to zoom.</span>
+      <span>One finger moves. Tap to click.<br><b>To select: tap twice and slide on the 2nd tap, or press and hold, then slide.</b><br>Two fingers scroll or pinch to zoom.</span>
     </div>
     <div class="pad-btns">
       <button class="btn padbtn" type="button" data-pb="left">Left click</button>
@@ -288,7 +288,7 @@ details.guide[open] summary::after{content:"\2212"}
       <button class="btn padbtn" type="button" data-pb="right">Right click</button>
     </div>
     <button class="btn block" style="margin-top:10px" id="openPad" type="button"><svg class="i"><use href="#i-expand"/></svg>Full-screen touchpad</button>
-    <p class="note">Full-screen mode pauses hand tracking so the camera is released.</p>
+    <p class="note">Hand tracking pauses while the Touchpad tab is open (so it cannot fight the touchpad) and resumes when you leave.</p>
 
     <h2>Touchpad settings</h2>
     <div class="group">
@@ -321,7 +321,7 @@ details.guide[open] summary::after{content:"\2212"}
       <dl>
         <dt>Move</dt><dd>Slide one finger. Slow movements are precise, fast ones travel further.</dd>
         <dt>Click and double click</dt><dd>Tap once to click. Tap twice quickly to double click.</dd>
-        <dt>Select text or drag</dt><dd>Double-tap and move: tap once, then touch again straight away, keep your finger down on that second touch and slide. The text is selected as you move. Lift to finish. For long drags use Drag lock, or hold Left click with one thumb and move with another finger.</dd>
+        <dt>Select text or drag</dt><dd>Option 1: tap once, then touch again straight away, keep your finger down on that second touch and slide. Option 2: press and hold one finger still for half a second until you feel a buzz and see "Selecting", then slide. Lift to finish. For long drags use Drag lock, or hold Left click with one thumb and move with another finger.</dd>
         <dt>Right click</dt><dd>Tap with two fingers, or use the Right click button.</dd>
         <dt>Middle click</dt><dd>Tap with three fingers.</dd>
         <dt>Scroll</dt><dd>Slide two fingers up, down, left or right.</dd>
@@ -446,7 +446,7 @@ details.guide[open] summary::after{content:"\2212"}
 
 <div class="fs" id="fsPad" role="dialog" aria-label="Full-screen touchpad">
   <div class="fs-head"><span>Touchpad</span><button class="btn sm" id="closePad" type="button">Close</button></div>
-  <div class="pad" id="touchpadFs"><svg class="i" style="width:32px;height:32px"><use href="#i-pointer"/></svg><span>One finger moves. Tap to click.<br><b>To select: tap twice, keep finger down on the 2nd tap and move.</b><br>Two fingers scroll or pinch.</span></div>
+  <div class="pad" id="touchpadFs"><svg class="i" style="width:32px;height:32px"><use href="#i-pointer"/></svg><span>One finger moves. Tap to click.<br><b>To select: tap twice and slide on the 2nd tap, or press and hold, then slide.</b><br>Two fingers scroll or pinch.</span></div>
   <div class="pad-btns">
     <button class="btn padbtn" type="button" data-pb="left">Left click</button>
     <button class="btn padlock" type="button" aria-pressed="false">Drag lock</button>
@@ -519,6 +519,7 @@ function showTab(name) {
   $$('.tab').forEach(s => { s.hidden = s.id !== 'tab-' + name; });
   $$('.tabbtn').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   window.scrollTo(0, 0);
+  syncEngineForTab(name);
 }
 $$('.tabbtn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 $('connPill').onclick = () => showTab('setup');
@@ -657,7 +658,7 @@ $('kbInput').addEventListener('keydown', (e) => {
 });
 
 /* ======================= touchpad ======================= */
-const TAP_MS = 250, TAP2_MS = 320, DTAP_MS = 380, TAP_SLOP = 10, DEADZONE = 3, SWIPE3_PX = 60;
+const TAP_MS = 300, TAP2_MS = 350, DTAP_MS = 450, TAP_SLOP = 12, DEADZONE = 3, SWIPE3_PX = 60, HOLD_MS = 450;
 const pad = { dx: 0, dy: 0, sx: 0, sy: 0, z: 0, raf: 0 };   // pending motion, flushed once per animation frame
 const padHeld = new Set();                                    // mouse buttons the touchpad is holding down
 let dragLock = false;
@@ -713,7 +714,7 @@ function setupTouchpad(el) {
   const quiet = () => { clearTimeout(chipTimer); chip.classList.remove('on'); };
 
   const g = { fingers: 0, max: 0, t0: 0, path: 0, cx: 0, cy: 0, lt: 0, v: 0, dist: 0, mode: 'none', decided: '',
-    accX: 0, accY: 0, accD: 0, drag: false, lastTap: 0, swiped: false, slop: false };
+    accX: 0, accY: 0, accD: 0, drag: false, lastTap: 0, swiped: false, slop: false, hold: 0 };
 
   const center = (ts) => { let x = 0, y = 0; for (const t of ts) { x += t.clientX; y += t.clientY; } return { x: x / ts.length, y: y / ts.length }; };
   const spread = (ts) => ts.length < 2 ? 0 : Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
@@ -724,12 +725,23 @@ function setupTouchpad(el) {
     const ts = e.targetTouches, n = ts.length, now = performance.now();
     if (!n) return;
     el.classList.add('active');
-    if (g.fingers === 0) {                               // a new gesture begins
+    clearTimeout(g.hold);
+    // n === 1 can only be a brand-new gesture, so this also repairs a state left over by a lost touchend
+    if (g.fingers === 0 || n === 1) {
+      if (g.drag) { g.drag = false; mouseButton('left', false); }
       g.t0 = now; g.path = 0; g.max = n; g.mode = 'move'; g.decided = ''; g.v = 0; g.swiped = false; g.slop = false;
-      g.accX = g.accY = g.accD = 0; g.drag = false;
-      if (n === 1 && settings.tapClick && !dragLock && g.lastTap && now - g.lastTap < DTAP_MS) {
-        g.drag = true; g.lastTap = 0;                    // tap, then touch again: second click or drag
-        mouseButton('left', true); buzz(8);
+      g.accX = g.accY = g.accD = 0;
+      if (n === 1 && settings.tapClick && !dragLock) {
+        if (g.lastTap && now - g.lastTap < DTAP_MS) {    // tap, then touch again and keep going: drag / select
+          g.drag = true; g.lastTap = 0;
+          mouseButton('left', true); buzz(15); tip('Selecting', 0); log('Tap-and-drag: button held');
+        } else {                                         // press and hold still: also starts a drag / select
+          g.hold = setTimeout(() => {
+            if (g.fingers === 1 && g.mode === 'move' && !g.slop && !g.drag) {
+              g.drag = true; mouseButton('left', true); buzz(25); tip('Selecting', 0); log('Hold-to-select: button held');
+            }
+          }, HOLD_MS);
+        }
       }
     }
     g.max = Math.max(g.max, n);
@@ -788,15 +800,16 @@ function setupTouchpad(el) {
   function finish(e) {
     if (e.cancelable) e.preventDefault();
     const ts = e.targetTouches, n = ts.length;
-    if (n > 0) { g.fingers = n; rebase(ts); return; }     // other fingers still down
+    if (n > 0) { clearTimeout(g.hold); g.fingers = n; rebase(ts); return; }     // other fingers still down
     const cancelled = e.type === 'touchcancel';
+    clearTimeout(g.hold);
     flushNow();
     const now = performance.now(), dur = now - g.t0;
     el.classList.remove('active'); quiet();
     if (g.drag) {
       g.drag = false; g.lastTap = 0; mouseButton('left', false);
     } else if (!cancelled && settings.tapClick && !dragLock) {
-      if (g.max === 1 && g.mode === 'move' && dur < TAP_MS && g.path < TAP_SLOP) {
+      if (g.max === 1 && g.mode === 'move' && !g.slop && dur < TAP_MS && g.path < TAP_SLOP) {
         sendCmd({ cmd: 'click', button: 'left' }); g.lastTap = now; buzz(8);
       } else if (g.max === 2 && !g.decided && dur < TAP2_MS && g.path < TAP_SLOP) {
         sendCmd({ cmd: 'click', button: 'right' }); tip('Right click', 600); buzz(12);
@@ -851,6 +864,19 @@ function initPadSettings() {
       log(`${label}: ${settings[key] ? 'on' : 'off'}`);
     };
   });
+}
+
+// Hand tracking sends its own absolute cursor moves and loads the phone's CPU, which fights the touchpad.
+let pausedForTab = false;
+function syncEngineForTab(name) {
+  const busy = engine.state === 'on' || engine.state === 'starting';
+  if (name === 'touchpad' && busy) {
+    pausedForTab = true; log('Touchpad tab: hand tracking paused so it cannot interfere. It resumes when you leave the tab.');
+    engineGen++; teardownTracking(); setEngineState('paused');
+  } else if (name !== 'touchpad' && pausedForTab) {
+    pausedForTab = false;
+    if (!$('fsPad').classList.contains('on')) { log('Resuming hand tracking.'); setEngine(true); }
+  }
 }
 
 let resumeAfterPad = false;
@@ -939,7 +965,7 @@ function renderEngine() {
     const fps = $('fpsStat').textContent;
     status = settings.hidePreview ? 'Tracking with preview hidden' : 'Tracking' + (fps !== '--' ? ` at ${fps} fps` : '');
     if (settings.hidePreview) { state = 'hidden'; text = 'Preview hidden. The camera is still tracking, but nothing is drawn on screen.'; } else state = 'live';
-  } else if (s === 'paused') { text = 'Paused while the full-screen touchpad is open. The camera is released.'; status = 'Paused. Camera is not in use.'; }
+  } else if (s === 'paused') { text = 'Paused while the touchpad is open. The camera is released.'; status = 'Paused. Camera is not in use.'; }
   else if (s === 'error') { text = engine.error || 'Camera unavailable.'; status = 'Could not start'; }
   vp.dataset.state = state;
   $('vpText').textContent = text;
