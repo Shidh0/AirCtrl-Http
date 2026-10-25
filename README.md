@@ -49,5 +49,5 @@ python Setup.py
 ## To Update
 ```bash
 cd AirCtrl-http
-curl -o index.html https://raw.githubusercontent.com/Shidh0/AirCtrl-Http/refs/heads/main/index.html
+Update.cmd
 ```
