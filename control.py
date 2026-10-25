@@ -10,6 +10,9 @@ Usage:
     python control.py                 start the server
     python control.py --show-pin      print the PIN and the phone pairing link
     python control.py --reset-pin     generate a new PIN
+    python control.py --no-pin        start WITHOUT asking for a PIN (this run only)
+    python control.py --pin-off       never ask for a PIN again (saved in config.json)
+    python control.py --pin-on        ask for the PIN again
     python control.py --debug         verbose logging
 """
 import argparse
@@ -34,12 +37,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from logging.handlers import RotatingFileHandler
 from urllib.parse import urlsplit
 
-VERSION = "2.0"
+VERSION = "2.1"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 INDEX_PATH = os.path.join(BASE_DIR, "index.html")
 
-DEFAULT_CONFIG = {"http_port": 8000, "ws_port": 9999, "token": ""}
+DEFAULT_CONFIG = {"http_port": 8000, "ws_port": 9999, "token": "", "require_pin": True}
 
 # --- limits -----------------------------------------------------------------
 MAX_CLIENTS = 4              # simultaneous authenticated phones
@@ -205,6 +208,28 @@ def _write_config(cfg):
     os.replace(tmp, CONFIG_PATH)
 
 
+def parse_bool(value, default=True):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in ("0", "false", "off", "no", "n"):
+            return False
+        if text in ("1", "true", "on", "yes", "y"):
+            return True
+    return default
+
+
+def set_pin_required(required):
+    """Persist the 'ask for a PIN' switch in config.json."""
+    cfg = load_config()
+    cfg["require_pin"] = bool(required)
+    _write_config(cfg)
+    return cfg
+
+
 def load_config(reset_token=False):
     cfg = dict(DEFAULT_CONFIG)
     try:
@@ -232,6 +257,7 @@ def load_config(reset_token=False):
         token = generate_token()
         changed = True
     cfg["token"] = token
+    cfg["require_pin"] = parse_bool(cfg.get("require_pin", True), True)
     if changed or not os.path.exists(CONFIG_PATH):
         try:
             _write_config(cfg)
@@ -268,6 +294,19 @@ def ip_allowed(ip_text):
     return bool(ip.is_private or ip.is_loopback or ip.is_link_local or ip in CGNAT)
 
 
+def enable_dpi_awareness():
+    """Use real pixels so the cursor lands exactly where the phone says on scaled displays."""
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
 def get_screen_resolution():
     try:
         user32 = ctypes.windll.user32
@@ -287,6 +326,13 @@ def _num(value, lo, hi):
     if not math.isfinite(n):
         raise ValueError("not finite")
     return int(max(lo, min(hi, n)))
+
+
+def _fnum(value, lo, hi):
+    n = float(value)
+    if not math.isfinite(n):
+        raise ValueError("not finite")
+    return max(lo, min(hi, n))
 
 
 def resolve_key(name):
@@ -320,8 +366,12 @@ def sanitize_command(data):
             return {"cmd": cmd, "button": button}
         if cmd == "doubleclick":
             return {"cmd": "doubleclick"}
-        if cmd == "scroll":
-            return {"cmd": "scroll", "amount": _num(data.get("amount", 0), -50, 50)}
+        if cmd == "scroll":      # amounts are wheel notches and may be fractional (smooth scrolling)
+            return {"cmd": "scroll",
+                    "amount": _fnum(data.get("amount", 0), -50, 50),
+                    "h": _fnum(data.get("h", 0), -50, 50)}
+        if cmd == "zoom":        # Ctrl + wheel (pinch to zoom)
+            return {"cmd": "zoom", "amount": _fnum(data.get("amount", 0), -20, 20)}
         if cmd == "press":
             key = resolve_key(data.get("key"))
             return None if key is None else {"cmd": "press", "key": key}
@@ -360,7 +410,7 @@ class Stats:
 
 
 STATS = Stats()
-DROPPABLE = {"move", "move_rel", "scroll"}
+DROPPABLE = {"move", "move_rel", "scroll", "zoom"}
 
 
 class CommandQueue:
@@ -387,6 +437,10 @@ class CommandQueue:
                         return
                     if name == "scroll":
                         last["amount"] = max(-100, min(100, last["amount"] + cmd["amount"]))
+                        last["h"] = max(-100, min(100, last["h"] + cmd["h"]))
+                        return
+                    if name == "zoom":
+                        last["amount"] = max(-40, min(40, last["amount"] + cmd["amount"]))
                         return
             if len(self._dq) >= self._maxlen and name in DROPPABLE:
                 STATS.add("dropped")
@@ -401,6 +455,20 @@ class CommandQueue:
             return self._dq.popleft()
 
 
+_mouse_event_ready = False
+
+
+def _win_mouse_event(flags, data):
+    """Raw wheel event so scrolling can be smaller than one full notch."""
+    global _mouse_event_ready
+    fn = ctypes.windll.user32.mouse_event
+    if not _mouse_event_ready:
+        fn.argtypes = [ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_size_t]
+        fn.restype = None
+        _mouse_event_ready = True
+    fn(flags, 0, 0, data & 0xFFFFFFFF, 0)
+
+
 class InputWorker(threading.Thread):
     def __init__(self, queue_):
         super().__init__(name="input-worker", daemon=True)
@@ -408,6 +476,23 @@ class InputWorker(threading.Thread):
         self.mouse = mouse_ctl.Controller()
         self.keyboard = kb_ctl.Controller()
         self._held = set()
+        self._rem = [0.0, 0.0]          # fractional scroll carried over (non-Windows)
+
+    def _wheel(self, vertical, horizontal=0.0):
+        """Scroll by (possibly fractional) wheel notches. Positive = up / right."""
+        if sys.platform == "win32":
+            for amount, flag in ((vertical, 0x0800), (horizontal, 0x1000)):   # WHEEL, HWHEEL
+                delta = int(round(amount * 120))
+                if delta:
+                    _win_mouse_event(flag, delta)
+            return
+        self._rem[0] += horizontal
+        self._rem[1] += vertical
+        dx, dy = int(self._rem[0]), int(self._rem[1])
+        if dx or dy:
+            self._rem[0] -= dx
+            self._rem[1] -= dy
+            self.mouse.scroll(dx, dy)
 
     def run(self):
         logging.info("Input worker started")
@@ -440,7 +525,13 @@ class InputWorker(threading.Thread):
             self.mouse.release(btn)
             self._held.discard(btn)
         elif name == "scroll":
-            self.mouse.scroll(0, c["amount"])
+            self._wheel(c["amount"], c["h"])
+        elif name == "zoom":
+            self.keyboard.press(kb_ctl.Key.ctrl)
+            try:
+                self._wheel(c["amount"])
+            finally:
+                self.keyboard.release(kb_ctl.Key.ctrl)
         elif name == "press":
             self.keyboard.press(c["key"])
             self.keyboard.release(c["key"])
@@ -551,6 +642,7 @@ class AppState:
     def __init__(self, cfg, queue_):
         self.cfg = cfg
         self.token = cfg["token"]
+        self.require_pin = cfg.get("require_pin", True)
         self.queue = queue_
         self.clients = set()
         self.failures = {}       # ip -> [count, blocked_until]
@@ -608,16 +700,21 @@ def auth_failed(ip):
 
 
 def check_auth(raw):
+    """Return "ok", "empty" (no PIN was sent) or "bad"."""
     if not isinstance(raw, str) or len(raw) > 256:
-        return False
+        return "bad"
     try:
         msg = json.loads(raw)
     except ValueError:
-        return False
+        return "bad"
     if not isinstance(msg, dict) or msg.get("cmd") != "auth":
-        return False
+        return "bad"
+    if not STATE.require_pin:        # PIN switched off: any local device may connect
+        return "ok"
     candidate = normalize_token(msg.get("token", ""))[:64]
-    return hmac.compare_digest(candidate.encode(), STATE.token.encode())
+    if not candidate:
+        return "empty"
+    return "ok" if hmac.compare_digest(candidate.encode(), STATE.token.encode()) else "bad"
 
 
 async def _close(ws, code, reason):
@@ -646,11 +743,15 @@ async def handle_websocket(ws):
     started = time.monotonic()
     try:
         raw = await asyncio.wait_for(ws.recv(), AUTH_TIMEOUT)
-        if not check_auth(raw):
-            auth_failed(ip)
-            logging.warning("Wrong PIN from %s", ip)
+        result = check_auth(raw)
+        if result != "ok":
+            if result == "bad" and STATE.require_pin:
+                auth_failed(ip)
+                logging.warning("Wrong PIN from %s", ip)
+            else:      # the phone just has no PIN saved yet; do not count it as an attack
+                logging.info("%s connected without a PIN", ip)
             try:
-                await ws.send(json.dumps({"type": "auth_failed"}))
+                await ws.send(json.dumps({"type": "auth_failed", "pin_required": STATE.require_pin}))
             except Exception:
                 pass
             return await _close(ws, 4401, "bad pin")
@@ -660,7 +761,8 @@ async def handle_websocket(ws):
         STATE.clients.add(ws)
         SCREEN["w"], SCREEN["h"] = get_screen_resolution()
         await ws.send(json.dumps({"type": "init", "screen_w": SCREEN["w"],
-                                  "screen_h": SCREEN["h"], "version": VERSION}))
+                                  "screen_h": SCREEN["h"], "version": VERSION,
+                                  "pin_required": STATE.require_pin}))
         logging.info("Client connected: %s (%d active)", ip, len(STATE.clients))
 
         bucket = TokenBucket(RATE_PER_SEC, RATE_BURST)
@@ -774,6 +876,16 @@ def load_dependencies():
         "space": kb_ctl.Key.space,
         "esc": kb_ctl.Key.esc,
         "tab": kb_ctl.Key.tab,
+        "up": kb_ctl.Key.up,
+        "down": kb_ctl.Key.down,
+        "left": kb_ctl.Key.left,
+        "right": kb_ctl.Key.right,
+        "delete": kb_ctl.Key.delete,
+        "home": kb_ctl.Key.home,
+        "end": kb_ctl.Key.end,
+        "pageup": kb_ctl.Key.page_up,
+        "pagedown": kb_ctl.Key.page_down,
+        "f5": kb_ctl.Key.f5,
     }
     BUTTON_MAP = {
         "left": mouse_ctl.Button.left,
@@ -789,6 +901,11 @@ def out(text=""):
 
 def print_pairing(cfg):
     ip = get_local_ip()
+    if not cfg.get("require_pin", True):
+        out("PIN:  OFF  (anyone on your local network can connect)")
+        out(f"Open on your phone:  http://{ip}:{cfg['http_port']}/")
+        out("Turn the PIN back on with:  python control.py --pin-on")
+        return
     out(f"PIN:  {format_token(cfg['token'])}")
     out(f"Open on your phone:  http://{ip}:{cfg['http_port']}/#pin={cfg['token']}")
     out("(The link fills in the PIN for you. Keep both private.)")
@@ -799,10 +916,19 @@ def main():
     parser.add_argument("--show-pin", action="store_true", help="print the PIN and pairing link")
     parser.add_argument("--reset-pin", action="store_true", help="generate a new PIN")
     parser.add_argument("--debug", action="store_true", help="verbose logging")
+    parser.add_argument("--no-pin", action="store_true",
+                        help="start without asking for a PIN (this run only)")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--pin-off", action="store_true",
+                       help="stop asking for a PIN, saved in config.json")
+    group.add_argument("--pin-on", action="store_true", help="ask for the PIN again")
     args = parser.parse_args()
 
-    if args.show_pin or args.reset_pin:
+    if args.show_pin or args.reset_pin or args.pin_off or args.pin_on:
         cfg = load_config(reset_token=args.reset_pin)
+        if args.pin_off or args.pin_on:
+            cfg = set_pin_required(args.pin_on)
+            out("PIN is now " + ("required." if args.pin_on else "OFF. Restart Air Mouse for it to take effect."))
         if args.reset_pin:
             out("New PIN generated. Restart Air Mouse for it to take effect.")
         print_pairing(cfg)
@@ -815,6 +941,11 @@ def main():
     logging.info("Log file: %s", log_path or "(none - could not create a log file)")
 
     cfg = load_config()
+    if args.no_pin:
+        cfg["require_pin"] = False
+    if not cfg["require_pin"]:
+        logging.warning("PIN is OFF: any device on your local network can control this PC.")
+    enable_dpi_awareness()
     load_dependencies()
 
     SCREEN["w"], SCREEN["h"] = get_screen_resolution()
@@ -841,8 +972,11 @@ def main():
     threading.Thread(target=http_server.serve_forever, name="http-server", daemon=True).start()
 
     ip = get_local_ip()
-    logging.info("Phone web app: http://%s:%d  (run 'python control.py --show-pin' for the PIN)",
-                 ip, cfg["http_port"])
+    if cfg["require_pin"]:
+        logging.info("Phone web app: http://%s:%d  (run 'python control.py --show-pin' for the PIN)",
+                     ip, cfg["http_port"])
+    else:
+        logging.info("Phone web app: http://%s:%d  (no PIN needed)", ip, cfg["http_port"])
 
     try:
         asyncio.run(ws_main(cfg["ws_port"]))

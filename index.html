@@ -133,9 +133,16 @@ details.guide[open] summary::after{content:"\2212"}
 .pad{height:min(46vh,340px);min-height:220px;border-radius:var(--r-xl);border:1px solid var(--line);touch-action:none;user-select:none;-webkit-user-select:none;
   background:radial-gradient(circle,#1a2c34 1px,transparent 1.5px) 0 0/22px 22px,var(--field);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--dim);text-align:center;font-size:.86rem}
-.pad:active{border-color:var(--accent)}
-.pad-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.pad-btns .btn{min-height:54px}
+.pad{position:relative;-webkit-touch-callout:none}
+.pad.active{border-color:var(--accent)}
+.pad .chip{position:absolute;top:10px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:999px;background:var(--accent-soft);
+  color:var(--accent);font-size:.78rem;font-weight:600;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
+.pad .chip.on{opacity:1}
+.pad-btns{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;margin-top:10px}
+.pad-btns .btn{min-height:54px;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad-btns .btn.down{background:#20353e}
+.btn[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tile.txt{justify-content:center;min-height:52px;font-size:.95rem}
 
 /* key tiles */
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -273,14 +280,55 @@ details.guide[open] summary::after{content:"\2212"}
     <h2>Touchpad</h2>
     <div class="pad" id="touchpad">
       <svg class="i" style="width:28px;height:28px"><use href="#i-pointer"/></svg>
-      <span>One finger moves. Two fingers scroll. Tap to click.</span>
+      <span>One finger moves. Tap to click, tap twice to double click.<br>Two fingers scroll or pinch to zoom.</span>
     </div>
     <div class="pad-btns">
-      <button class="btn" type="button" data-cmd='{"cmd":"click","button":"left"}'>Left click</button>
-      <button class="btn" type="button" data-cmd='{"cmd":"click","button":"right"}'>Right click</button>
+      <button class="btn padbtn" type="button" data-pb="left">Left click</button>
+      <button class="btn padlock" type="button" aria-pressed="false">Drag lock</button>
+      <button class="btn padbtn" type="button" data-pb="right">Right click</button>
     </div>
     <button class="btn block" style="margin-top:10px" id="openPad" type="button"><svg class="i"><use href="#i-expand"/></svg>Full-screen touchpad</button>
     <p class="note">Full-screen mode pauses hand tracking so the camera is released.</p>
+
+    <h2>Touchpad settings</h2>
+    <div class="group">
+      <div class="row">
+        <span class="lbl">Pointer speed</span>
+        <input type="range" id="padSpeedSlider" min="1" max="10" step="0.5" value="6" aria-label="Pointer speed">
+        <span class="val" id="padSpeedVal">6.0</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Scroll speed</span>
+        <input type="range" id="scrollSpeedSlider" min="1" max="10" step="0.5" value="4" aria-label="Scroll speed">
+        <span class="val" id="scrollSpeedVal">4.0</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Tap to click<span class="hint">Tap, double tap, tap and drag, two-finger tap</span></span>
+        <button class="switch" id="tapSwitch" role="switch" aria-checked="true" aria-label="Tap to click" type="button"><span class="knob"></span></button>
+      </div>
+      <div class="row">
+        <span class="lbl">Natural scrolling<span class="hint">Content follows your fingers</span></span>
+        <button class="switch" id="naturalSwitch" role="switch" aria-checked="false" aria-label="Natural scrolling" type="button"><span class="knob"></span></button>
+      </div>
+      <div class="row">
+        <span class="lbl">Vibrate on click</span>
+        <button class="switch" id="hapticSwitch" role="switch" aria-checked="true" aria-label="Vibrate on click" type="button"><span class="knob"></span></button>
+      </div>
+    </div>
+
+    <details class="guide">
+      <summary>Touchpad gestures</summary>
+      <dl>
+        <dt>Move</dt><dd>Slide one finger. Slow movements are precise, fast ones travel further.</dd>
+        <dt>Click and double click</dt><dd>Tap once to click. Tap twice quickly to double click.</dd>
+        <dt>Select text or drag</dt><dd>Tap, then touch again straight away and keep your finger down while you move. Lift to drop. For long drags use Drag lock, or hold Left click with one thumb and move with another finger.</dd>
+        <dt>Right click</dt><dd>Tap with two fingers, or use the Right click button.</dd>
+        <dt>Middle click</dt><dd>Tap with three fingers.</dd>
+        <dt>Scroll</dt><dd>Slide two fingers up, down, left or right.</dd>
+        <dt>Zoom</dt><dd>Pinch two fingers together or apart (sends Ctrl + scroll).</dd>
+        <dt>Three-finger swipe</dt><dd>Up for Task view, down for Show desktop, left or right for Alt + Tab.</dd>
+      </dl>
+    </details>
   </main>
 
   <!-- KEYS -->
@@ -296,6 +344,27 @@ details.guide[open] summary::after{content:"\2212"}
         <button class="btn" type="button" data-cmd='{"cmd":"press","key":"backspace"}'>Backspace</button>
       </div>
     </div>
+    <h2>Navigation</h2>
+    <div class="tiles">
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"esc"}'>Esc</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"up"}' aria-label="Up">&uarr;</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"delete"}'>Delete</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"left"}' aria-label="Left">&larr;</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"down"}' aria-label="Down">&darr;</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"right"}' aria-label="Right">&rarr;</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"tab"}'>Tab</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"home"}'>Home</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"press","key":"end"}'>End</button>
+    </div>
+    <h2>Edit</h2>
+    <div class="tiles">
+      <button class="tile txt" type="button" data-cmd='{"cmd":"hotkey","keys":["ctrl","c"]}'>Copy</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"hotkey","keys":["ctrl","v"]}'>Paste</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"hotkey","keys":["ctrl","x"]}'>Cut</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"hotkey","keys":["ctrl","z"]}'>Undo</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"hotkey","keys":["ctrl","y"]}'>Redo</button>
+      <button class="tile txt" type="button" data-cmd='{"cmd":"hotkey","keys":["ctrl","a"]}'>Select all</button>
+    </div>
     <h2>Shortcuts</h2>
     <div class="tiles">
       <button class="tile" type="button" data-cmd='{"cmd":"press","key":"volumeup"}'><svg class="i"><use href="#i-vol-up"/></svg>Volume up</button>
@@ -307,6 +376,8 @@ details.guide[open] summary::after{content:"\2212"}
       <button class="tile" type="button" data-cmd='{"cmd":"hotkey","keys":["alt","tab"]}'><svg class="i"><use href="#i-layers"/></svg>Alt + Tab</button>
       <button class="tile" type="button" data-cmd='{"cmd":"hotkey","keys":["win","d"]}'><svg class="i"><use href="#i-monitor"/></svg>Show desktop</button>
       <button class="tile" type="button" data-cmd='{"cmd":"press","key":"f11"}'><svg class="i"><use href="#i-expand"/></svg>Full screen</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"hotkey","keys":["win","tab"]}'><svg class="i"><use href="#i-layers"/></svg>Task view</button>
+      <button class="tile" type="button" data-cmd='{"cmd":"press","key":"f5"}'><svg class="i"><use href="#i-flip"/></svg>Refresh</button>
     </div>
   </main>
 
@@ -320,11 +391,11 @@ details.guide[open] summary::after{content:"\2212"}
       </div>
       <div class="row">
         <label class="lbl" for="pcPin">PIN</label>
-        <input class="field" type="password" id="pcPin" placeholder="XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12">
+        <input class="field" type="password" id="pcPin" placeholder="XXXX-XXXX (blank if PIN is off)" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12">
       </div>
       <div class="pair" style="padding-top:12px;grid-template-columns:1fr"><button class="btn primary" id="connectBtn" type="button">Connect</button></div>
     </div>
-    <p class="note">Find the PIN on your PC by running <code>python control.py --show-pin</code>. It is stored only on this phone.</p>
+    <p class="note">Find the PIN on your PC by running <code>python control.py --show-pin</code>. It is stored only on this phone. Tired of the PIN? Run <code>python control.py --pin-off</code> on the PC (or start with <code>--no-pin</code>) and leave this field empty.</p>
 
     <h2>Camera source</h2>
     <div class="group" style="padding:12px 14px 14px">
@@ -375,10 +446,11 @@ details.guide[open] summary::after{content:"\2212"}
 
 <div class="fs" id="fsPad" role="dialog" aria-label="Full-screen touchpad">
   <div class="fs-head"><span>Touchpad</span><button class="btn sm" id="closePad" type="button">Close</button></div>
-  <div class="pad" id="touchpadFs"><svg class="i" style="width:32px;height:32px"><use href="#i-pointer"/></svg><span>One finger moves. Two fingers scroll.<br>Tap to click.</span></div>
+  <div class="pad" id="touchpadFs"><svg class="i" style="width:32px;height:32px"><use href="#i-pointer"/></svg><span>One finger moves. Tap to click.<br>Two fingers scroll or pinch.</span></div>
   <div class="pad-btns">
-    <button class="btn" type="button" data-cmd='{"cmd":"click","button":"left"}'>Left click</button>
-    <button class="btn" type="button" data-cmd='{"cmd":"click","button":"right"}'>Right click</button>
+    <button class="btn padbtn" type="button" data-pb="left">Left click</button>
+    <button class="btn padlock" type="button" aria-pressed="false">Drag lock</button>
+    <button class="btn padbtn" type="button" data-pb="right">Right click</button>
   </div>
 </div>
 
@@ -394,7 +466,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
 const DEFAULTS = { engine: true, hidePreview: false, sens: 4, twoHand: false, res: 240, complexity: 0,
-  detect: 0.3, track: 0.3, fps: 30, facing: 'user', source: 'local', streamIp: '', pcIp: '' };
+  detect: 0.3, track: 0.3, fps: 30, facing: 'user', source: 'local', streamIp: '', pcIp: '',
+  padSpeed: 6, scrollSpeed: 4, natural: false, tapClick: true, haptics: true };
 const settings = Object.assign({}, DEFAULTS);
 try { Object.assign(settings, JSON.parse(store.get('airmouse.settings', '{}'))); } catch {}
 const saveSettings = () => store.set('airmouse.settings', JSON.stringify(settings));
@@ -478,7 +551,7 @@ function closeConn() {
   clearTimeout(conn.timer); clearTimeout(conn.authTimer);
   const ws = conn.ws; conn.ws = null;
   if (ws) { ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null; try { ws.close(); } catch {} }
-  isHolding = false;
+  isHolding = false; resetPadState();
 }
 
 function scheduleReconnect(delay) {
@@ -492,11 +565,7 @@ function scheduleReconnect(delay) {
 function connect(raw) {
   const target = parseHost(raw);
   if (!target) { setConn('offline'); log('Enter a valid PC address, for example 192.168.1.20', 'error'); return; }
-  const pin = getPin();
-  if (!pin) {
-    setConn('needpin'); log('Enter the PIN from "python control.py --show-pin" to connect.', 'warn');
-    showTab('setup'); $('pcPin').focus(); return;
-  }
+  const pin = getPin();      // may be empty: the PC tells us whether it needs one
   closeConn();
   conn.stop = false; conn.badPin = false; conn.host = target.host; conn.port = target.port;
   settings.pcIp = target.port === 9999 ? target.host : `${target.host}:${target.port}`; saveSettings();
@@ -523,17 +592,18 @@ function connect(raw) {
       clearTimeout(conn.authTimer);
       if (Number.isFinite(data.screen_w) && Number.isFinite(data.screen_h)) { SCREEN_W = data.screen_w; SCREEN_H = data.screen_h; }
       conn.delay = 1000; setConn('connected');
-      log(`Connected. PC screen ${SCREEN_W}x${SCREEN_H}`);
+      log(`Connected. PC screen ${SCREEN_W}x${SCREEN_H}` + (data.pin_required === false ? ' (PIN is off on the PC)' : ''));
     } else if (data.type === 'auth_failed') {
       conn.badPin = true;
     }
   };
   ws.onclose = (ev) => {
     if (conn.ws !== ws) return;
-    clearTimeout(conn.authTimer); conn.ws = null; isHolding = false;
+    clearTimeout(conn.authTimer); conn.ws = null; isHolding = false; resetPadState();
     if (conn.stop) { setConn('offline'); return; }
     if (conn.badPin || ev.code === 4401) {
-      setConn('badpin'); log('The PC rejected the PIN. Check it and connect again.', 'error');
+      if (!getPin()) { setConn('needpin'); log('This PC asks for a PIN. Enter it below, or run "python control.py --pin-off" on the PC.', 'warn'); }
+      else { setConn('badpin'); log('The PC rejected the PIN. Check it and connect again.', 'error'); }
       showTab('setup'); $('pcPin').focus(); return;
     }
     if (ev.code === 4429) { setConn('locked'); log('Too many wrong PINs. The PC blocked this phone for 5 minutes.', 'error'); scheduleReconnect(60000); return; }
@@ -543,16 +613,17 @@ function connect(raw) {
   ws.onerror = () => logThrottled('wserr', 'Cannot reach the PC. Check the address, that control.py is running, and the firewall.', 'error', 8000);
 }
 
-function sendCmd(payload) {
+function sendCmd(payload) {          // returns true when the command was actually sent
   const ws = conn.ws;
-  if (!ws || ws.readyState !== WebSocket.OPEN || conn.state !== 'connected') return;
-  if (ws.bufferedAmount > 16384 && (payload.cmd === 'move' || payload.cmd === 'move_rel')) return; // network is congested
+  if (!ws || ws.readyState !== WebSocket.OPEN || conn.state !== 'connected') return false;
+  const c = payload.cmd;
+  if (ws.bufferedAmount > 16384 && (c === 'move' || c === 'move_rel' || c === 'scroll' || c === 'zoom')) return false; // congested
   ws.send(JSON.stringify(payload));
+  return true;
 }
 
 $('connectBtn').onclick = () => {
-  const pinRaw = $('pcPin').value.trim();
-  if (pinRaw) store.set('airmouse.pin', pinRaw.toUpperCase());
+  store.set('airmouse.pin', $('pcPin').value.trim().toUpperCase());   // empty clears it (PIN off on the PC)
   connect($('pcIp').value);
 };
 document.addEventListener('click', (e) => {
@@ -560,20 +631,23 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   try { sendCmd(JSON.parse(b.dataset.cmd)); } catch (err) { log(`Bad button: ${err.message}`, 'error'); }
 });
+const canAutoReconnect = () => conn.host && !conn.ws && !conn.stop && !['badpin', 'needpin', 'locked'].includes(conn.state);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
+  if (document.hidden) { releasePad(); return; }
   loop.lastTick = performance.now();
-  if (conn.host && !conn.ws && !conn.stop && conn.state !== 'badpin' && conn.state !== 'locked') connect(`${conn.host}:${conn.port}`);
+  if (canAutoReconnect()) connect(`${conn.host}:${conn.port}`);
   if (engine.state === 'on' && sourceDead()) { log('Camera stopped while in the background. Restarting...', 'warn'); restartSource(); }
 });
-window.addEventListener('online', () => { if (conn.host && !conn.ws) connect(`${conn.host}:${conn.port}`); });
+window.addEventListener('online', () => { if (canAutoReconnect()) connect(`${conn.host}:${conn.port}`); });
 
 /* ======================= live keyboard ======================= */
 let prevKb = '';
 $('kbInput').addEventListener('input', (e) => {
-  const v = e.target.value;
-  if (v.length > prevKb.length) sendCmd({ cmd: 'type', text: v.slice(prevKb.length) });
-  else for (let i = 0; i < Math.min(prevKb.length - v.length, 50); i++) sendCmd({ cmd: 'press', key: 'backspace' });
+  const v = e.target.value;          // diff by common prefix so autocorrect and predictions work
+  let i = 0; const lim = Math.min(prevKb.length, v.length);
+  while (i < lim && prevKb[i] === v[i]) i++;
+  for (let k = 0; k < Math.min(prevKb.length - i, 50); k++) sendCmd({ cmd: 'press', key: 'backspace' });
+  if (v.length > i) sendCmd({ cmd: 'type', text: v.slice(i) });
   prevKb = v;
   if (v.length > 40) { e.target.value = ''; prevKb = ''; }
 });
@@ -583,45 +657,206 @@ $('kbInput').addEventListener('keydown', (e) => {
 });
 
 /* ======================= touchpad ======================= */
+const TAP_MS = 250, TAP2_MS = 320, DTAP_MS = 260, TAP_SLOP = 10, DEADZONE = 3, SWIPE3_PX = 60;
+const pad = { dx: 0, dy: 0, sx: 0, sy: 0, z: 0, raf: 0 };   // pending motion, flushed once per animation frame
+const padHeld = new Set();                                    // mouse buttons the touchpad is holding down
+let dragLock = false;
+
+function buzz(ms = 10) { if (settings.haptics && navigator.vibrate) { try { navigator.vibrate(ms); } catch {} } }
+
+function flushNow() { if (pad.raf) { cancelAnimationFrame(pad.raf); flushPad(); } }   // keep motion ordered before clicks/releases
+function mouseButton(btn, down) {
+  flushNow();
+  if (down) padHeld.add(btn); else padHeld.delete(btn);
+  sendCmd({ cmd: down ? 'mousedown' : 'mouseup', button: btn });
+}
+function syncLockUi() { $$('.padlock').forEach(b => b.setAttribute('aria-pressed', String(dragLock))); }
+function setDragLock(on) {
+  if (on === dragLock) return;
+  dragLock = on; mouseButton('left', on); syncLockUi(); buzz(on ? 20 : 10);
+  log(on ? 'Drag lock on: left button is held. Move to select or drag, tap Drag lock again to drop.' : 'Drag lock off.');
+}
+function resetPadState() {            // connection gone: the PC releases buttons itself
+  padHeld.clear(); dragLock = false; syncLockUi();
+  pad.dx = pad.dy = pad.sx = pad.sy = pad.z = 0;
+}
+function releasePad() {               // app going to background: let go of anything held
+  for (const b of Array.from(padHeld)) sendCmd({ cmd: 'mouseup', button: b });
+  resetPadState();
+}
+
+function padSchedule() { if (!pad.raf) pad.raf = requestAnimationFrame(flushPad); }
+function flushPad() {
+  pad.raf = 0;
+  if (conn.state !== 'connected') { pad.dx = pad.dy = pad.sx = pad.sy = pad.z = 0; return; }
+  const ix = Math.trunc(pad.dx), iy = Math.trunc(pad.dy);
+  if ((ix || iy) && sendCmd({ cmd: 'move_rel', dx: ix, dy: iy })) { pad.dx -= ix; pad.dy -= iy; }
+  const qy = Math.trunc(pad.sy * 8) / 8, qx = Math.trunc(pad.sx * 8) / 8;      // wheel notches, in 1/8 steps
+  if ((qy || qx) && sendCmd({ cmd: 'scroll', amount: qy, h: qx })) { pad.sy -= qy; pad.sx -= qx; }
+  const z = Math.trunc(pad.z);
+  if (z && sendCmd({ cmd: 'zoom', amount: z })) pad.z -= z;
+  pad.dx = Math.max(-1500, Math.min(1500, pad.dx)); pad.dy = Math.max(-1500, Math.min(1500, pad.dy));
+  // anything still pending means the network was congested: try again next frame
+  if (Math.abs(pad.dx) >= 1 || Math.abs(pad.dy) >= 1 || Math.abs(pad.sy) >= 0.125 || Math.abs(pad.sx) >= 0.125 || Math.abs(pad.z) >= 1) padSchedule();
+}
+
+// Pointer acceleration: slow finger = precise, fast finger = covers the screen.
+function moveGain(v) {                // v = finger speed in px/ms
+  const base = 0.35 + settings.padSpeed * 0.25;
+  return base * Math.min(3.2, 0.55 + v * 0.9);
+}
+
 function setupTouchpad(el) {
-  let lastX = 0, lastY = 0, last2Y = 0, startT = 0, moved = 0, multi = false;
+  const chip = document.createElement('div'); chip.className = 'chip'; el.appendChild(chip);
+  let chipTimer = 0;
+  const tip = (text, ms = 700) => { chip.textContent = text; chip.classList.add('on'); clearTimeout(chipTimer); if (ms) chipTimer = setTimeout(() => chip.classList.remove('on'), ms); };
+  const quiet = () => { clearTimeout(chipTimer); chip.classList.remove('on'); };
+
+  const g = { fingers: 0, max: 0, t0: 0, path: 0, cx: 0, cy: 0, lt: 0, v: 0, dist: 0, mode: 'none', decided: '',
+    accX: 0, accY: 0, accD: 0, drag: false, lastTap: 0, swiped: false, slop: false };
+
+  const center = (ts) => { let x = 0, y = 0; for (const t of ts) { x += t.clientX; y += t.clientY; } return { x: x / ts.length, y: y / ts.length }; };
+  const spread = (ts) => ts.length < 2 ? 0 : Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+  const rebase = (ts) => { const c = center(ts); g.cx = c.x; g.cy = c.y; g.dist = spread(ts); g.lt = performance.now(); };
+
   el.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1) {
-      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; startT = Date.now(); moved = 0; multi = false;
-    } else if (e.touches.length === 2) {
-      multi = true; last2Y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    e.preventDefault();
+    const ts = e.targetTouches, n = ts.length, now = performance.now();
+    if (!n) return;
+    el.classList.add('active');
+    if (g.fingers === 0) {                               // a new gesture begins
+      g.t0 = now; g.path = 0; g.max = n; g.mode = 'move'; g.decided = ''; g.v = 0; g.swiped = false; g.slop = false;
+      g.accX = g.accY = g.accD = 0; g.drag = false;
+      if (n === 1 && settings.tapClick && !dragLock && g.lastTap && now - g.lastTap < DTAP_MS) {
+        g.drag = true; g.lastTap = 0;                    // tap, then touch again: second click or drag
+        mouseButton('left', true); buzz(8);
+      }
     }
-  }, { passive: true });
+    g.max = Math.max(g.max, n);
+    if (n >= 2 && !g.drag) {                             // more fingers: scroll / zoom / swipe
+      const mode = n === 2 ? 'two' : 'three';
+      if (g.mode !== mode) { g.mode = mode; g.decided = ''; g.accX = g.accY = g.accD = 0; }
+    }
+    g.fingers = n; rebase(ts);
+  }, { passive: false });
+
   el.addEventListener('touchmove', (e) => {
     e.preventDefault();
-    if (e.touches.length === 1 && !multi) {
-      const x = e.touches[0].clientX, y = e.touches[0].clientY;
-      const dx = (x - lastX) * 1.8, dy = (y - lastY) * 1.8;
-      if (Math.hypot(dx, dy) >= 0.5) {
-        moved += Math.hypot(x - lastX, y - lastY);
-        sendCmd({ cmd: 'move_rel', dx: Math.round(dx), dy: Math.round(dy) });
-        lastX = x; lastY = y;
+    const ts = e.targetTouches, n = ts.length;
+    if (!n) return;
+    const now = performance.now(), c = center(ts), d = spread(ts);
+    const dx = c.x - g.cx, dy = c.y - g.cy, dt = Math.max(now - g.lt, 1), dd = n >= 2 ? d - g.dist : 0;
+    g.cx = c.x; g.cy = c.y; g.dist = d; g.lt = now;
+    const step = Math.hypot(dx, dy);
+    g.path += step;
+
+    if (g.mode === 'move') {
+      if (n !== 1 && !g.drag) return;
+      if (!g.slop) { if (g.path < DEADZONE) return; g.slop = true; if (g.drag) tip('Dragging', 0); }
+      g.v = g.v * 0.6 + (step / dt) * 0.4;
+      const gain = moveGain(g.v);
+      pad.dx += dx * gain; pad.dy += dy * gain; padSchedule();
+    } else if (g.mode === 'two' && n >= 2) {
+      g.accX += dx; g.accY += dy; g.accD += dd;
+      let useX = dx, useY = dy, useD = dd;
+      if (!g.decided) {
+        const pan = Math.hypot(g.accX, g.accY);
+        if (Math.abs(g.accD) > 16 && Math.abs(g.accD) > pan * 1.6) g.decided = 'zoom';
+        else if (pan > 8) g.decided = 'scroll';
+        if (g.decided) { tip(g.decided === 'zoom' ? 'Zoom' : 'Scrolling', 0); useX = g.accX; useY = g.accY; useD = g.accD; }
       }
-    } else if (e.touches.length === 2) {
-      const y2 = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const dy = y2 - last2Y;
-      if (Math.abs(dy) > 3) {
-        const amount = Math.round(-dy / 5);
-        if (amount !== 0) { sendCmd({ cmd: 'scroll', amount }); last2Y = y2; }
+      if (g.decided === 'scroll') {
+        const boost = 1 + Math.min(step / dt, 3) * 0.35;             // a little acceleration for fast flicks
+        const k = boost / (180 / settings.scrollSpeed);              // finger pixels -> wheel notches
+        const dir = settings.natural ? 1 : -1;
+        pad.sy += dir * useY * k; pad.sx -= dir * useX * k; padSchedule();
+      } else if (g.decided === 'zoom') {
+        pad.z += useD / 40; padSchedule();
+      }
+    } else if (g.mode === 'three' && n >= 3 && !g.swiped) {
+      g.accX += dx; g.accY += dy;
+      if (Math.hypot(g.accX, g.accY) > SWIPE3_PX) {
+        g.swiped = true; buzz(15);
+        if (Math.abs(g.accY) > Math.abs(g.accX)) {
+          if (g.accY < 0) { sendCmd({ cmd: 'hotkey', keys: ['win', 'tab'] }); tip('Task view', 700); }
+          else { sendCmd({ cmd: 'hotkey', keys: ['win', 'd'] }); tip('Show desktop', 700); }
+        } else { sendCmd({ cmd: 'hotkey', keys: ['alt', 'tab'] }); tip('Switch window', 700); }
       }
     }
   }, { passive: false });
-  el.addEventListener('touchend', (e) => {
-    if (e.touches.length === 0 && !multi && Date.now() - startT < 200 && moved < 8) sendCmd({ cmd: 'click', button: 'left' });
-  });
-  el.addEventListener('touchcancel', () => { multi = true; });
+
+  function finish(e) {
+    if (e.cancelable) e.preventDefault();
+    const ts = e.targetTouches, n = ts.length;
+    if (n > 0) { g.fingers = n; rebase(ts); return; }     // other fingers still down
+    const cancelled = e.type === 'touchcancel';
+    flushNow();
+    const now = performance.now(), dur = now - g.t0;
+    el.classList.remove('active'); quiet();
+    if (g.drag) {
+      g.drag = false; g.lastTap = 0; mouseButton('left', false);
+    } else if (!cancelled && settings.tapClick && !dragLock) {
+      if (g.max === 1 && g.mode === 'move' && dur < TAP_MS && g.path < TAP_SLOP) {
+        sendCmd({ cmd: 'click', button: 'left' }); g.lastTap = now; buzz(8);
+      } else if (g.max === 2 && !g.decided && dur < TAP2_MS && g.path < TAP_SLOP) {
+        sendCmd({ cmd: 'click', button: 'right' }); tip('Right click', 600); buzz(12);
+      } else if (g.max >= 3 && !g.swiped && dur < TAP2_MS && g.path < TAP_SLOP * 1.5) {
+        sendCmd({ cmd: 'click', button: 'middle' }); tip('Middle click', 600); buzz(12);
+      }
+    }
+    g.fingers = 0; g.mode = 'none';
+  }
+  el.addEventListener('touchend', finish, { passive: false });
+  el.addEventListener('touchcancel', finish, { passive: false });
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 setupTouchpad($('touchpad'));
 setupTouchpad($('touchpadFs'));
 
+// Left / right buttons behave like real ones: held while pressed, so you can press and drag.
+$$('.padbtn').forEach((b) => {
+  const btn = b.dataset.pb;
+  let id = null, consumed = false;
+  b.addEventListener('pointerdown', (e) => {
+    if (id !== null) return;
+    e.preventDefault(); id = e.pointerId; b.classList.add('down');
+    try { b.setPointerCapture(id); } catch {}
+    if (btn === 'left' && dragLock) { consumed = true; setDragLock(false); return; }   // pressing left drops a drag lock
+    consumed = false; mouseButton(btn, true); buzz(8);
+  });
+  const up = (e) => {
+    if (e.pointerId !== id) return;
+    id = null; b.classList.remove('down');
+    if (!consumed) mouseButton(btn, false);
+    consumed = false;
+  };
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointercancel', up);
+  b.addEventListener('contextmenu', (e) => e.preventDefault());
+});
+$$('.padlock').forEach((b) => b.addEventListener('click', () => setDragLock(!dragLock)));
+
+function initPadSettings() {
+  [['padSpeed', 'padSpeedSlider', 'padSpeedVal'], ['scrollSpeed', 'scrollSpeedSlider', 'scrollSpeedVal']].forEach(([key, sliderId, valId]) => {
+    const el = $(sliderId), out = $(valId);
+    el.value = settings[key]; out.textContent = Number(settings[key]).toFixed(1);
+    el.addEventListener('input', () => { settings[key] = parseFloat(el.value); out.textContent = settings[key].toFixed(1); });
+    el.addEventListener('change', saveSettings);
+  });
+  [['natural', 'naturalSwitch', 'Natural scrolling'], ['tapClick', 'tapSwitch', 'Tap to click'], ['haptics', 'hapticSwitch', 'Vibrate on click']].forEach(([key, id, label]) => {
+    const el = $(id);
+    el.setAttribute('aria-checked', String(!!settings[key]));
+    el.onclick = () => {
+      settings[key] = !settings[key]; el.setAttribute('aria-checked', String(settings[key])); saveSettings();
+      log(`${label}: ${settings[key] ? 'on' : 'off'}`);
+    };
+  });
+}
+
 let resumeAfterPad = false;
 $('openPad').onclick = () => {
   $('fsPad').classList.add('on');
+  try { if (document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch {}
   if (engine.state === 'on' || engine.state === 'starting') {
     resumeAfterPad = true; log('Full-screen touchpad: pausing hand tracking and releasing the camera.');
     engineGen++; teardownTracking(); setEngineState('paused');
@@ -629,6 +864,7 @@ $('openPad').onclick = () => {
 };
 $('closePad').onclick = () => {
   $('fsPad').classList.remove('on');
+  try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch {}
   if (resumeAfterPad) { resumeAfterPad = false; log('Resuming hand tracking.'); setEngine(true); }
 };
 
@@ -1086,7 +1322,7 @@ $('loadStream').onclick = () => {
 };
 
 /* ======================= lifecycle ======================= */
-window.addEventListener('pagehide', () => { releaseHold(); stopSource(); closeConn(); });
+window.addEventListener('pagehide', () => { releaseHold(); releasePad(); stopSource(); closeConn(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('fsPad').classList.contains('on')) $('closePad').click(); });
 
 (function init() {
@@ -1101,6 +1337,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('fsPad
   $('trackSlider').value = settings.track; $('trackVal').textContent = Number(settings.track).toFixed(2);
   $('streamIp').value = settings.streamIp || '';
   $('pcPin').value = getPin();
+  initPadSettings();
   setSource(engine.mode);
   renderEngine();
   setConn('offline');
@@ -1110,8 +1347,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('fsPad
   const hasHost = pageHost && pageHost !== 'localhost' && pageHost !== '127.0.0.1';
   const host = hasHost ? pageHost : settings.pcIp;
   $('pcIp').value = host || '';
-  if (host && getPin()) connect(host);
-  else { showTab('setup'); log(host ? 'Enter the PIN to connect.' : 'Enter your PC address and PIN to connect.', 'warn'); }
+  if (host) connect(host);
+  else { showTab('setup'); log('Enter your PC address to connect.', 'warn'); }
 
   if (settings.engine) setEngine(true);
 })();

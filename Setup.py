@@ -1,8 +1,10 @@
 """
 Air Mouse host setup.
 
-    python Setup.py                 install dependencies, create PIN, offer autostart
-    python Setup.py --yes           same, no questions (autostart enabled)
+    python Setup.py                 install dependencies, choose PIN or no PIN, offer autostart
+    python Setup.py --yes           same, no questions (autostart enabled, PIN setting unchanged)
+    python Setup.py --no-pin        turn the PIN requirement off (phone connects without it)
+    python Setup.py --pin           turn the PIN requirement on
     python Setup.py --remove-startup   remove the autostart entry
 """
 import argparse
@@ -49,16 +51,39 @@ def install_requirements():
     return ok
 
 
-def create_pin():
-    """control.py creates config.json (with a random PIN) on first use."""
+def choose_pin_flag(args):
+    """Return the control.py flag to apply, or None to leave the current setting alone."""
+    if args.no_pin:
+        return "--pin-off"
+    if args.pin:
+        return "--pin-on"
+    if args.yes:
+        return None
+    try:
+        answer = input(
+            "\n? Require a PIN when a phone connects?\n"
+            "  y = yes (safest), n = no PIN (less hassle, fine on a trusted home Wi-Fi),\n"
+            "  Enter = keep the current setting: "
+        ).strip().lower()
+    except EOFError:           # non-interactive run
+        return None
+    if answer in ("n", "no"):
+        return "--pin-off"
+    if answer in ("y", "yes"):
+        return "--pin-on"
+    return None
+
+
+def configure_pin(flag):
+    """control.py creates config.json (with a random PIN) on first use and prints the pairing link."""
     try:
         result = subprocess.run(
-            [sys.executable, os.path.join(SCRIPT_DIR, "control.py"), "--show-pin"],
+            [sys.executable, os.path.join(SCRIPT_DIR, "control.py"), flag or "--show-pin"],
             capture_output=True, text=True, cwd=SCRIPT_DIR,
         )
         print("\n" + (result.stdout.strip() or result.stderr.strip()))
     except OSError as exc:
-        print(f"Could not create the PIN: {exc}")
+        print(f"Could not set up the PIN: {exc}")
 
 
 def write_pythonw_path():
@@ -119,6 +144,9 @@ def main():
     parser = argparse.ArgumentParser(description="Air Mouse host setup")
     parser.add_argument("--yes", action="store_true", help="answer yes to all questions")
     parser.add_argument("--remove-startup", action="store_true", help="remove the autostart entry")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--no-pin", action="store_true", help="do not require a PIN")
+    group.add_argument("--pin", action="store_true", help="require a PIN")
     args = parser.parse_args()
 
     if args.remove_startup:
@@ -134,7 +162,7 @@ def main():
         print("\nSome dependencies failed to install. Fix that, then run Setup.py again.")
         sys.exit(1)
 
-    create_pin()
+    configure_pin(choose_pin_flag(args))
 
     if sys.platform == "win32":
         add_to_startup(args.yes)
@@ -144,7 +172,9 @@ def main():
         print("\nNon-Windows system detected; skipping the Windows autostart step.")
 
     print("\nSetup complete. Start the host with:  python control.py")
-    print("Show the PIN again any time with:      python control.py --show-pin")
+    print("Start once without a PIN:              python control.py --no-pin")
+    print("Turn the PIN off / on for good:        python control.py --pin-off  /  --pin-on")
+    print("Show the PIN or link again:            python control.py --show-pin")
     print("Logs are written to server.log next to control.py.")
 
 
