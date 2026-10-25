@@ -280,7 +280,7 @@ details.guide[open] summary::after{content:"\2212"}
     <h2>Touchpad</h2>
     <div class="pad" id="touchpad">
       <svg class="i" style="width:28px;height:28px"><use href="#i-pointer"/></svg>
-      <span>One finger moves. Tap to click, tap twice to double click.<br>Two fingers scroll or pinch to zoom.</span>
+      <span>One finger moves. Tap to click.<br><b>To select: tap twice, but keep your finger down on the 2nd tap and move.</b><br>Two fingers scroll or pinch to zoom.</span>
     </div>
     <div class="pad-btns">
       <button class="btn padbtn" type="button" data-pb="left">Left click</button>
@@ -321,7 +321,7 @@ details.guide[open] summary::after{content:"\2212"}
       <dl>
         <dt>Move</dt><dd>Slide one finger. Slow movements are precise, fast ones travel further.</dd>
         <dt>Click and double click</dt><dd>Tap once to click. Tap twice quickly to double click.</dd>
-        <dt>Select text or drag</dt><dd>Tap, then touch again straight away and keep your finger down while you move. Lift to drop. For long drags use Drag lock, or hold Left click with one thumb and move with another finger.</dd>
+        <dt>Select text or drag</dt><dd>Double-tap and move: tap once, then touch again straight away, keep your finger down on that second touch and slide. The text is selected as you move. Lift to finish. For long drags use Drag lock, or hold Left click with one thumb and move with another finger.</dd>
         <dt>Right click</dt><dd>Tap with two fingers, or use the Right click button.</dd>
         <dt>Middle click</dt><dd>Tap with three fingers.</dd>
         <dt>Scroll</dt><dd>Slide two fingers up, down, left or right.</dd>
@@ -446,7 +446,7 @@ details.guide[open] summary::after{content:"\2212"}
 
 <div class="fs" id="fsPad" role="dialog" aria-label="Full-screen touchpad">
   <div class="fs-head"><span>Touchpad</span><button class="btn sm" id="closePad" type="button">Close</button></div>
-  <div class="pad" id="touchpadFs"><svg class="i" style="width:32px;height:32px"><use href="#i-pointer"/></svg><span>One finger moves. Tap to click.<br>Two fingers scroll or pinch.</span></div>
+  <div class="pad" id="touchpadFs"><svg class="i" style="width:32px;height:32px"><use href="#i-pointer"/></svg><span>One finger moves. Tap to click.<br><b>To select: tap twice, keep finger down on the 2nd tap and move.</b><br>Two fingers scroll or pinch.</span></div>
   <div class="pad-btns">
     <button class="btn padbtn" type="button" data-pb="left">Left click</button>
     <button class="btn padlock" type="button" aria-pressed="false">Drag lock</button>
@@ -657,7 +657,7 @@ $('kbInput').addEventListener('keydown', (e) => {
 });
 
 /* ======================= touchpad ======================= */
-const TAP_MS = 250, TAP2_MS = 320, DTAP_MS = 260, TAP_SLOP = 10, DEADZONE = 3, SWIPE3_PX = 60;
+const TAP_MS = 250, TAP2_MS = 320, DTAP_MS = 380, TAP_SLOP = 10, DEADZONE = 3, SWIPE3_PX = 60;
 const pad = { dx: 0, dy: 0, sx: 0, sy: 0, z: 0, raf: 0 };   // pending motion, flushed once per animation frame
 const padHeld = new Set();                                    // mouse buttons the touchpad is holding down
 let dragLock = false;
